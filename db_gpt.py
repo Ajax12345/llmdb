@@ -1,5 +1,6 @@
 import openai
 
+#https://platform.openai.com/docs/overview
 client = openai.OpenAI(
   api_key="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"
 )
