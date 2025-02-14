@@ -1,4 +1,4 @@
--- start query 50 in stream 0 using template query50.tpl 
+
 SELECT s_store_name, 
                s_company_id, 
                s_street_number, 

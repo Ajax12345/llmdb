@@ -1,4 +1,4 @@
--- start query 49 in stream 0 using template query49.tpl 
+
 SELECT 'web' AS channel, 
                web.item, 
                web.return_ratio, 

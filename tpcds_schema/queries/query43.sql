@@ -1,4 +1,4 @@
--- start query 43 in stream 0 using template query43.tpl 
+
 SELECT s_store_name, 
                s_store_id, 
                Sum(CASE 

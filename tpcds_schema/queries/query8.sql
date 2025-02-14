@@ -1,4 +1,4 @@
--- start query 8 in stream 0 using template query8.tpl 
+
 SELECT s_store_name, 
                Sum(ss_net_profit) 
 FROM   store_sales, 

@@ -1,4 +1,4 @@
--- start query 61 in stream 0 using template query61.tpl 
+
 SELECT promotions, 
                total, 
                Cast(promotions AS DECIMAL(15, 4)) / 

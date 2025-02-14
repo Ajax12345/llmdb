@@ -1,4 +1,4 @@
--- start query 53 in stream 0 using template query53.tpl 
+
 SELECT * 
 FROM   (
 SELECT manufact_id,

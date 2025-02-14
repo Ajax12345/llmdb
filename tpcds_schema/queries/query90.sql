@@ -1,5 +1,5 @@
 
--- start query 90 in stream 0 using template query90.tpl 
+
 SELECT Cast(amc AS DECIMAL(15, 4)) / Cast(pmc AS DECIMAL(15, 4)) 
                am_pm_ratio 
 FROM   (SELECT Count(*) amc 

@@ -1,4 +1,4 @@
--- start query 63 in stream 0 using template query63.tpl 
+
 SELECT * 
 FROM   (
 SELECT         manager_id,

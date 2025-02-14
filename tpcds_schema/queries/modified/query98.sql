@@ -1,4 +1,4 @@
--- start query 98 in stream 0 using template query98.tpl 
+
 SELECT
        item_id,
        item_desc,
