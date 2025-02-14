@@ -1,5 +1,6 @@
 import typing, collections
 import sqlglot, os, re
+import db_gpt, json
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -50,6 +51,10 @@ def parse_workload(workload:str) -> typing.List:
 
     }[workload]()
 
+def vectorize_workload(workload:str) -> None:
+    with open(f'{workload}_schema/query_embeddings.json', 'w') as f:
+        json.dump({a:db_gpt.get_embedding(db_gpt.CLIENT, b.sql()) 
+            for a, b in parse_workload(workload).items()}, f)
+
 if __name__ == '__main__':
-    l = parse_workload('tpcds')
-    print(l['query1.sql'].sql())
+    vectorize_workload('tpcds')
