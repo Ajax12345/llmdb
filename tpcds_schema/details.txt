@@ -1,2 +1,3 @@
 schema origin:
-    https://github.com/memsql/benchmarks-tpc/tree/1c6b0abe277d00535f857079663fb73bfcc1fafb/tpch
+    https://github.com/memsql/benchmarks-tpc/blob/1c6b0abe277d00535f857079663fb73bfcc1fafb/tpcds/create-tables.sql
+    https://github.com/Agirish/tpcds

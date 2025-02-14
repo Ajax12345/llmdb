@@ -3,6 +3,7 @@ import openai, typing
 #https://platform.openai.com/docs/overview
 #https://github.com/intellectronica/text-clustering-embedding-vs-prompting/blob/main/text-clustering-embedding-vs-prompting.ipynb
 #https://github.com/fanchongjion/LATuner/blob/main/mab.py#L42
+#https://platform.openai.com/docs/guides/function-calling
 
 
 CLIENT = openai.OpenAI(
@@ -16,7 +17,7 @@ def get_embedding(client, text:str) -> typing.List[float]:
         encoding_format="float"
     ).data[0].embedding
 
-def completion_test():
+def completion_test(client):
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         store=True,
