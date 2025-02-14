@@ -2,7 +2,7 @@ import openai, typing
 
 #https://platform.openai.com/docs/overview
 #https://github.com/intellectronica/text-clustering-embedding-vs-prompting/blob/main/text-clustering-embedding-vs-prompting.ipynb
-
+#https://github.com/fanchongjion/LATuner/blob/main/mab.py#L42
 
 
 CLIENT = openai.OpenAI(
