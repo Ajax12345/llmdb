@@ -51,10 +51,22 @@ def parse_workload(workload:str) -> typing.List:
 
     }[workload]()
 
+def parse_workload_schema(workload:str) -> dict:
+    with open(f'{workload}_schema/schema.sql') as f:
+        return {i.this.this.name:i for i in sqlglot.parse(f.read())}
+    
+
 def vectorize_workload(workload:str) -> None:
     with open(f'{workload}_schema/query_embeddings.json', 'w') as f:
         json.dump({a:db_gpt.get_embedding(db_gpt.CLIENT, b.sql()) 
             for a, b in parse_workload(workload).items()}, f)
 
+def vectorize_schema(workload:str) -> None:
+    with open(f'{workload}_schema/schema_embeddings.json', 'w') as f:
+        json.dump({a:db_gpt.get_embedding(db_gpt.CLIENT, b.sql()) 
+            for a, b in parse_workload_schema(workload).items()}, f)
+
+
 if __name__ == '__main__':
-    vectorize_workload('tpcds')
+    #vectorize_workload('tpcds')
+    vectorize_schema('job')
