@@ -116,9 +116,9 @@ class Workload:
     def display_query_clusters(self) -> None:
         v = [
             ('kmeans', sklearn.cluster.KMeans(n_clusters=self.table_num, init="k-means++", random_state=42)),
-            ('AggCluster(cosine,avg)', sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num, metric='cosine', linkage = 'average')),
+            ('AggCluster(cosine,complete)', sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num, metric='cosine', linkage = 'complete')),
+            ('AggCluster(cosine,single)', sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num, metric='cosine', linkage = 'single')),
             ('AggCluster', sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num)),
-            ('DBSCAN(0.1)', sklearn.cluster.DBSCAN(eps = 0.1, metric = 'cosine'))
         ]
         
         #kmeans = 
@@ -153,5 +153,6 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    w = Workload('job')
-    w.display_query_clusters()
+    for i in ['tpch', 'tpcds', 'job']:
+        w = Workload(i)
+        w.display_query_clusters()
