@@ -156,7 +156,7 @@ class Workload:
 
             return d
     
-    def table_policies(self) -> typing.List[Policy]:
+    def gen_policy_cluster(self, filters:dict, *args, **kwargs) -> typing.List[Policy]:
         k = sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num)
         q_names, embeddings = zip(*self.query_embeddings)
         k.fit(embeddings)
@@ -179,6 +179,42 @@ class Workload:
             results.append(Policy(a, d[cl], probs, self))
         
         return results
+    
+    def gen_policy_top_k(self, filters:dict, k:int) -> typing.List[Policy]:
+        cos = torch.nn.CosineSimilarity(dim = 0)
+        s_max = torch.nn.Softmax()
+
+        results = []
+        for a, b in self._table_embeddings.items():
+            emb = [(j, k, 1 - cos(torch.tensor(b), torch.tensor(k))) 
+                    for j, k in self.query_embeddings if filters[self.workload](j)]
+            queries, _, emb_dist = zip(*sorted(emb, key=lambda x:x[-1])[:k])
+            print(a, queries, probs:=s_max(torch.tensor(emb_dist)*-1))
+            print('-'*5)
+            results.append(Policy(a, queries, probs, self))
+        
+        return results
+
+    def table_policies(self, algo:str = 'cluster', k:int = 5) -> typing.List[Policy]:
+        assert algo in ['cluster', 'top_k']
+
+        def tpch_filter(a:str) -> bool:
+            return True
+    
+        def job_filter(a:str) -> bool:
+            return not a.startswith('29') and a.endswith('a.sql')
+    
+        def tpcds_filter(a:str) -> bool:
+            return True
+        
+        filters = {
+            'tpch': tpch_filter,
+            'job': job_filter,
+            'tpcds': tpcds_filter,
+        }
+
+        return getattr(self, f'gen_policy_{algo}')(filters, k)
+    
         
     def query_costs_norm(self) -> float:
         d = self.query_costs()
@@ -243,12 +279,13 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    w = Workload('job')
-    w.table_policies()
+    w = Workload('tpch')
+    print(w.table_policies(algo='top_k'))
     
+    '''
     with open('job_schema/query_vis.json', 'w') as f:
         json.dump({a:b.sql() for a, b in w.queries.items()}, f, indent=4)
-
+    '''
     '''
     c = w.query_costs_norm()
     print('tpch final cost', c)
