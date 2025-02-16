@@ -1,6 +1,8 @@
 ML-Powered Index Tuning: An Overview of Recent Progress and Open Challenges
     https://arxiv.org/pdf/2308.13641
 
+Determining size of indexes:
+    https://stackoverflow.com/questions/781873/how-to-figure-out-size-of-indexes-in-mysql
 
 databases:
     - TPC-H: tpch
@@ -8,3 +10,7 @@ databases:
 
 tpch setup:
     ./dbgen -s 3 -f
+
+For query planner computations, perhaps remove top-five largest costs
+
+    - use a delta change in cost from initial (empty index) config to present

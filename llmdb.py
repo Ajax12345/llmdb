@@ -5,7 +5,9 @@ import sklearn.cluster
 import sklearn.manifold
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import numpy as np
+import numpy as np, mysql_conn
+import warnings, functools
+import time
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -108,6 +110,52 @@ class Workload:
             'queries': self.query_num,
             'tables': self.table_num,
         }
+    
+    def query_costs(self) -> dict:
+        def tpch_filter(a:str) -> bool:
+            return True
+    
+        def job_filter(a:str) -> bool:
+            return not a.startswith('29')
+    
+        def tpcds_filter(a:str) -> bool:
+            return True
+        
+        filters = {
+            'tpch': tpch_filter,
+            'job': job_filter,
+            'tpcds': tpcds_filter,
+        }
+
+        with mysql_conn.MySQL(database=self.workload) as conn:
+            d = {}
+            for a, b in self.queries.items():
+                if filters[self.workload](a):
+                    try:
+                        d[a] = conn.get_query_stats(b.sql())['cost']
+                    except Exception as e:
+                        print('got cost compute error', e)
+                        print(f'skipping compute for {a}')
+
+            return d
+        
+    def query_costs_norm(self) -> float:
+        d = self.query_costs()
+        print(d)
+        m, m1 = min(d.values()), max(d.values())
+        return sum((i-m)/(m1 - m) for i in d.values())
+        #return pow(functools.reduce(lambda x, y: x*y, d.values()), 1/len(d))
+
+    def workload_latency(self) -> float:
+        with mysql_conn.MySQL(database=self.workload) as conn:
+            t = time.time()
+            for a, b in self.queries.items():
+                print(a)
+                conn.execute(b.sql())
+                _ = conn.cur.fetchone()
+                #conn.cur.reset()
+            
+            return time.time() - t
 
     def __repr__(self) -> str:
         return f'<{str(self.meta)}>'
@@ -156,3 +204,11 @@ if __name__ == '__main__':
     for i in ['tpch', 'tpcds', 'job']:
         w = Workload(i)
         w.display_query_clusters()
+
+    '''
+    c = w.query_costs_norm()
+    print('tpch final cost', c)
+    w = Workload('job')
+    c = w.query_costs_norm()
+    print('job final cost', c)
+    '''
