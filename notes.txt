@@ -1,3 +1,10 @@
 ML-Powered Index Tuning: An Overview of Recent Progress and Open Challenges
     https://arxiv.org/pdf/2308.13641
 
+
+databases:
+    - TPC-H: tpch
+    - JOB: job
+
+tpch setup:
+    ./dbgen -s 3 -f

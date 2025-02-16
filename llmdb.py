@@ -91,7 +91,7 @@ class Workload:
 
     @property
     def query_embeddings(self) -> typing.List[list]:
-        return [self._query_embeddings[i] for i in sorted(self._query_embeddings)]
+        return [self._query_embeddings[i] for i in sorted(self.queries)]
 
     @property
     def table_num(self) -> int:

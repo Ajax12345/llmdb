@@ -119,6 +119,10 @@ update lineitem  set l_comment = "";
 -- /Users/jamespetullo/Downloads/TPC_H_official/dbgen/region.tbl
 -- /Users/jamespetullo/Downloads/TPC_H_official/dbgen/supplier.tbl
 
+-- SET GLOBAL local_infile=1;
+-- quit mysql
+-- mysql --local-infile=1 -u root -p
+
 LOAD DATA LOCAL INFILE '/Users/jamespetullo/Downloads/TPC_H_official/dbgen/region.tbl'     INTO TABLE region     FIELDS TERMINATED BY '|';
 LOAD DATA LOCAL INFILE '/Users/jamespetullo/Downloads/TPC_H_official/dbgen/nation.tbl'     INTO TABLE nation     FIELDS TERMINATED BY '|';
 LOAD DATA LOCAL INFILE '/Users/jamespetullo/Downloads/TPC_H_official/dbgen/customer.tbl' INTO TABLE customer   FIELDS TERMINATED BY '|';
