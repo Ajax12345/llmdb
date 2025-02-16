@@ -283,13 +283,19 @@ if __name__ == '__main__':
     #print(w.table_policies(algo='top_k'))
 
     with open('prompts/actor/system.txt') as f, \
-            open('prompts/actor/user.txt') as f1:
+            open('prompts/actor/user.txt') as f1, \
+            open('prompts/actor/critic_response.txt') as f2:
+        
         sys, user = f.read(), f1.read()
-        query = 'select sum(a.v + b.v) from test a join test1 b on a.id = b.id where a.val = "james"'
+        query = 'select sum(a.v + b.v) from test a join test1 b on a.id = b.id where a.val = "james" and a.k > 10'
         schema = """
-create table test (id int, v int, val text)
+create table test (id int, v int, val text, rec_id int, k int)
 """
-        user = user.format(query = query, schema = schema, table_name = "test")
+        user = user.format(query = query, 
+            schema = schema,
+            table_name = "test",
+            critic_response = "")
+        
         print(db_gpt.query_gpt(db_gpt.CLIENT, sys, user))
         
     
