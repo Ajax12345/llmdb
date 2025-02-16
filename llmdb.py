@@ -8,6 +8,7 @@ import matplotlib.colors as mcolors
 import numpy as np, mysql_conn
 import warnings, functools
 import time, torch, torch.nn
+import contextlib
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -81,6 +82,8 @@ def load_workload_schema_embeddings(workload:str) -> dict:
     with open(f'{workload}_schema/schema_embeddings.json') as f:
         return json.load(f)
 
+def parse_indexes_from_gpt(response:str) -> typing.List:
+    return json.loads(re.findall('(?<=```json)[^`]+(?=```)', response)[0])
 
 class Policy:
     def __init__(self, 
@@ -93,6 +96,16 @@ class Policy:
         self.queries = queries
         self.probabilities = probabilities
         self.workload = workload
+
+    @property
+    def table_columns(self) -> typing.List[str]:
+        return [i.this.this for i in self.workload.tables[self.table].this.expressions]
+
+    def action(self) -> typing.List[str]:
+        '''
+        Ensure that recommended columns from GPT actually exist in the table
+        Remove any explicit aliasing in column recommendation i.e table.col => col
+        '''
     
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.table})'
@@ -279,24 +292,35 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    #w = Workload('tpcds')
-    #print(w.table_policies(algo='top_k'))
+    w = Workload('job')
+    p = w.table_policies(algo='top_k')
 
     with open('prompts/actor/system.txt') as f, \
             open('prompts/actor/user.txt') as f1, \
             open('prompts/actor/critic_response.txt') as f2:
         
         sys, user = f.read(), f1.read()
-        query = 'select sum(a.v + b.v) from test a join test1 b on a.id = b.id where a.val = "james" and a.k > 10'
+        query = '''SELECT MIN(mi.info) AS movie_budget, MIN(mi_idx.info) AS movie_votes, MIN(n.name) AS male_writer, MIN(t.title) AS violent_movie_title FROM cast_info AS ci, info_type AS it1, info_type AS it2, keyword AS k, movie_info AS mi, movie_info_idx AS mi_idx, movie_keyword AS mk, name AS n, title AS t WHERE ci.note IN ('(writer)', '(head writer)', '(written by)', '(story)', '(story editor)') AND it1.info = 'genres' AND it2.info = 'votes' AND k.keyword IN ('murder', 'blood', 'gore', 'death', 'female-nudity') AND mi.info = 'Horror' AND n.gender = 'm' AND t.id = mi.movie_id AND t.id = mi_idx.movie_id AND t.id = ci.movie_id AND t.id = mk.movie_id AND ci.movie_id = mi.movie_id AND ci.movie_id = mi_idx.movie_id AND ci.movie_id = mk.movie_id AND mi.movie_id = mi_idx.movie_id AND mi.movie_id = mk.movie_id AND mi_idx.movie_id = mk.movie_id AND n.id = ci.person_id AND it1.id = mi.info_type_id AND it2.id = mi_idx.info_type_id AND k.id = mk.keyword_id'''
         schema = """
-create table test (id int, v int, val text, rec_id int, k int)
+CREATE TABLE person_info (
+    id integer NOT NULL PRIMARY KEY,
+    person_id integer NOT NULL,
+    info_type_id integer NOT NULL,
+    info text NOT NULL,
+    note text
+)
 """
         user = user.format(query = query, 
             schema = schema,
-            table_name = "test",
+            table_name = "person_info",
             critic_response = "")
         
-        print(db_gpt.query_gpt(db_gpt.CLIENT, sys, user))
+        
+        resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user)
+        
+        print(resp)
+        print('-'*60)
+        print(parse_indexes_from_gpt(resp))
         
     
     '''

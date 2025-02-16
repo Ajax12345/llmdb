@@ -1,0 +1,35 @@
+SELECT MIN(mi.info) AS movie_budget, MIN(mi_idx.info) AS movie_votes, MIN(n.name) AS male_writer, MIN(t.title) AS violent_movie_title FROM cast_info AS ci, info_type AS it1, info_type AS it2, keyword AS k, movie_info AS mi, movie_info_idx AS mi_idx, movie_keyword AS mk, name AS n, title AS t WHERE ci.note IN ('(writer)', '(head writer)', '(written by)', '(story)', '(story editor)') AND it1.info = 'genres' AND it2.info = 'votes' AND k.keyword IN ('murder', 'blood', 'gore', 'death', 'female-nudity') AND mi.info = 'Horror' AND n.gender = 'm' AND t.id = mi.movie_id AND t.id = mi_idx.movie_id AND t.id = ci.movie_id AND t.id = mk.movie_id AND ci.movie_id = mi.movie_id AND ci.movie_id = mi_idx.movie_id AND ci.movie_id = mk.movie_id AND mi.movie_id = mi_idx.movie_id AND mi.movie_id = mk.movie_id AND mi_idx.movie_id = mk.movie_id AND n.id = ci.person_id AND it1.id = mi.info_type_id AND it2.id = mi_idx.info_type_id AND k.id = mk.keyword_id
+
+CREATE TABLE name (
+    id integer NOT NULL PRIMARY KEY,
+    name text NOT NULL,
+    imdb_index varchar(12),
+    imdb_id integer,
+    gender varchar(1),
+    name_pcode_cf varchar(5),
+    name_pcode_nf varchar(5),
+    surname_pcode varchar(5),
+    md5sum varchar(32)
+)
+
+-----------------------GPT OUTPUT BELOW-----------------------
+
+To optimize the given SQL query, we should focus on the columns that are used in the WHERE clause to filter the results, specifically those that involve conditions on the `name` table.
+
+From the query, we can identify the relevant conditions that involve the `name` table:
+- `n.gender = 'm'`
+- `n.id = ci.person_id`
+
+For optimizing performance against these conditional checks, we should create indexes on the `gender` and `id` columns of the `name` table. By indexing these columns, we can speed up the filtering and JOIN operations that involve the `name` table.
+
+The relevant columns to index are:
+1. `gender`
+2. `id`
+
+In summary, we will index the `gender` and `id` columns from the `name` table.
+
+Here is the output in the required JSON format:
+
+```json
+["gender", "id"]
+```

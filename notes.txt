@@ -16,3 +16,6 @@ https://dbgroup.cs.tsinghua.edu.cn/ligl/papers/tutorial-llm-meets-db.pdf
 For query planner computations, perhaps remove top-five largest costs
 
     - use a delta change in cost from initial (empty index) config to present
+
+Prompt Notes:
+    tell LLM to be conservative with memory usage, only index columns that will explicitly reduce latency

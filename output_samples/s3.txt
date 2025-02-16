@@ -1,0 +1,44 @@
+SELECT MIN(mi.info) AS movie_budget, MIN(mi_idx.info) AS movie_votes, MIN(n.name) AS male_writer, MIN(t.title) AS violent_movie_title FROM cast_info AS ci, info_type AS it1, info_type AS it2, keyword AS k, movie_info AS mi, movie_info_idx AS mi_idx, movie_keyword AS mk, name AS n, title AS t WHERE ci.note IN ('(writer)', '(head writer)', '(written by)', '(story)', '(story editor)') AND it1.info = 'genres' AND it2.info = 'votes' AND k.keyword IN ('murder', 'blood', 'gore', 'death', 'female-nudity') AND mi.info = 'Horror' AND n.gender = 'm' AND t.id = mi.movie_id AND t.id = mi_idx.movie_id AND t.id = ci.movie_id AND t.id = mk.movie_id AND ci.movie_id = mi.movie_id AND ci.movie_id = mi_idx.movie_id AND ci.movie_id = mk.movie_id AND mi.movie_id = mi_idx.movie_id AND mi.movie_id = mk.movie_id AND mi_idx.movie_id = mk.movie_id AND n.id = ci.person_id AND it1.id = mi.info_type_id AND it2.id = mi_idx.info_type_id AND k.id = mk.keyword_id
+
+CREATE TABLE person_info (
+    id integer NOT NULL PRIMARY KEY,
+    person_id integer NOT NULL,
+    info_type_id integer NOT NULL,
+    info text NOT NULL,
+    note text
+)
+
+Here, GPT recommends indexes for another table with the same column names
+
+-----------------------GPT OUTPUT BELOW-----------------------
+
+
+To improve the performance of the given SQL query, we need to identify the columns that are used in filters and joins. The SQL query references several tables, and while we were provided with the schema for the `person_info` table, it's important to look for columns in the `person_info` table that are likely to be filtered or joined on.
+
+From the query, we can identify relevant filtering and joining terms:
+
+1. Joins:
+   - `n.id = ci.person_id` suggests that `ci.person_id` should be indexed.
+   - The references to `movie_id` suggest that columns related to `movie_id` in the relevant tables (e.g., `movie_info`, `movie_info_idx`, `cast_info`, `movie_keyword`) should ideally be indexed for faster joins, but we lack the schemas for those tables.
+
+2. Filters:
+   - `ci.note` is filtered using `IN ('(writer)', '(head writer)', '(written by)', '(story)', '(story editor)')`, indicating that this column could benefit from indexing.
+   - Other filters mentioned in the SQL query include checking `info_type_id` in relation to `info_type`, but we do not have that table's schema.
+
+Considering the `person_info` table:
+
+- `person_id` could be useful for indexing if it is frequently queried or joined upon, which is likely in this case.
+- `info_type_id` is also used in a joining condition with the `info_type` but indexing will depend on whether frequent queries filter by this column.
+- `note` is being filtered, so it can be a good candidate for indexing.
+
+Given these observations, the columns we could specifically index in the `person_info` table based on the above reasoning are:
+
+- `person_id`
+- `note`
+- `info_type_id` (since it's involved in a join, depending on how frequently it's used)
+
+Thus, the final JSON output would be as follows:
+
+```json
+["person_id", "note", "info_type_id"]
+```
