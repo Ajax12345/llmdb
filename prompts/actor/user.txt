@@ -1,0 +1,11 @@
+Given a SQL query and a SQL table schema, choose what columns in the table should be indexed so as to reduce the latency of the specified query.
+
+The query is given below:
+{query}
+
+The schema for table `{table_name}` is given below:
+{schema}
+
+Output the columns to be indexed in a list, for example, [col1, col2, col3] 
+
+[<PUT INDEXES IN HERE>]

@@ -1,0 +1,1 @@
+Imagine you are a human database administrator. Your job is to choose what columns in a database table to add an index to, given a SQL query and a SQL table schema.

@@ -17,17 +17,18 @@ def get_embedding(client, text:str) -> typing.List[float]:
         encoding_format="float"
     ).data[0].embedding
 
-def completion_test(client):
+def query_gpt(client, system:str, user:str) -> str:
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         store=True,
         messages=[
-            {"role": "user", "content": "write a haiku about ai"}
+            {"role": "system", "content": system},
+            {"role": "user", "content": user}
         ]
     )
 
 
-    print(completion.choices[0].message)
+    return completion.choices[0].message.content
 
 if __name__ == '__main__':
     print(get_embedding(CLIENT, "this is a test"))

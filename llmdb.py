@@ -279,8 +279,20 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    w = Workload('tpcds')
-    print(w.table_policies(algo='top_k'))
+    #w = Workload('tpcds')
+    #print(w.table_policies(algo='top_k'))
+
+    with open('prompts/actor/system.txt') as f, \
+            open('prompts/actor/user.txt') as f1:
+        sys, user = f.read(), f1.read()
+        query = 'select sum(a.v + b.v) from test a join test1 b on a.id = b.id where a.val = "james"'
+        schema = """
+create table test (id int, v int, val text)
+"""
+        user = user.format(query = query, schema = schema, table_name = "test")
+        print(db_gpt.query_gpt(db_gpt.CLIENT, sys, user))
+        
+    
     '''
     with open('tpcds_schema/query_vis.json', 'w') as f:
         json.dump({a:b.sql() for a, b in w.queries.items()}, f, indent=4)
