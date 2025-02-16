@@ -279,11 +279,10 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    w = Workload('tpch')
+    w = Workload('tpcds')
     print(w.table_policies(algo='top_k'))
-    
     '''
-    with open('job_schema/query_vis.json', 'w') as f:
+    with open('tpcds_schema/query_vis.json', 'w') as f:
         json.dump({a:b.sql() for a, b in w.queries.items()}, f, indent=4)
     '''
     '''
