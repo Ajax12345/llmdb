@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np, mysql_conn
 import warnings, functools
-import time
+import time, torch, torch.nn
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -81,6 +81,23 @@ def load_workload_schema_embeddings(workload:str) -> dict:
     with open(f'{workload}_schema/schema_embeddings.json') as f:
         return json.load(f)
 
+
+class Policy:
+    def __init__(self, 
+            table:str, 
+            queries:typing.List[str], 
+            probabilities:torch.tensor, 
+            workload:'Workload') -> None:
+        
+        self.table = table
+        self.queries = queries
+        self.probabilities = probabilities
+        self.workload = workload
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.table})'
+
+
 class Workload:
     def __init__(self, workload:str) -> None:
         self.workload = workload
@@ -93,7 +110,7 @@ class Workload:
 
     @property
     def query_embeddings(self) -> typing.List[list]:
-        return [self._query_embeddings[i] for i in sorted(self.queries)]
+        return [(i, self._query_embeddings[i]) for i in sorted(self.queries)]
 
     @property
     def table_num(self) -> int:
@@ -138,6 +155,30 @@ class Workload:
                         print(f'skipping compute for {a}')
 
             return d
+    
+    def table_policies(self) -> typing.List[Policy]:
+        k = sklearn.cluster.AgglomerativeClustering(n_clusters=self.table_num)
+        q_names, embeddings = zip(*self.query_embeddings)
+        k.fit(embeddings)
+        d = collections.defaultdict(list)
+        for a, b in zip(k.labels_, q_names):
+            d[a].append(b)
+        
+        d_emb = {a:torch.tensor([self._query_embeddings[i] for i in b]) 
+                    for a, b in d.items()}
+        
+        cos = torch.nn.CosineSimilarity(dim = 1)
+        s_max = torch.nn.Softmax()
+        print(d)
+        results = []
+        for a, b in self._table_embeddings.items():
+            d_emb_dist = [(j, (1 - cos(k, torch.tensor([b])))) for j, k in d_emb.items()]
+            cl, _emb = min(d_emb_dist, key=lambda x:x[1].min())
+            print(a, d[cl], probs:=s_max(_emb*-1))
+            print('-'*70)
+            results.append(Policy(a, d[cl], probs, self))
+        
+        return results
         
     def query_costs_norm(self) -> float:
         d = self.query_costs()
@@ -174,8 +215,9 @@ class Workload:
         fig, plts = plt.subplots(nrows=2, ncols=2)
         for p in plts:
             for P in p:
-                t, kmeans = v.pop(0)    
-                kmeans.fit(matrix:=self.query_embeddings)
+                t, kmeans = v.pop(0)
+                q_names, matrix = zip(*self.query_embeddings) 
+                kmeans.fit(matrix)
                 print(kmeans.labels_)
                 d = collections.defaultdict(list)
                 for i, a in enumerate(kmeans.labels_):
@@ -201,9 +243,11 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    for i in ['tpch', 'tpcds', 'job']:
-        w = Workload(i)
-        w.display_query_clusters()
+    w = Workload('job')
+    w.table_policies()
+    
+    with open('job_schema/query_vis.json', 'w') as f:
+        json.dump({a:b.sql() for a, b in w.queries.items()}, f, indent=4)
 
     '''
     c = w.query_costs_norm()
