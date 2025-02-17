@@ -448,17 +448,27 @@ CREATE TABLE lineitem
             print(f'arm: {a}, reward: {i}')
             bandit.update(a, i)
 
-if __name__ == '__main__':
-    w = Workload('tpch')
+def generate_indexes(workload:str) -> None:
+    start_time = time.time()
+    w = Workload(workload)
     p = w.table_policies(algo='top_k')
     for _ in range(3):
         for i in p:
             i.action()
 
-    
+    end_time = time.time()
     path = gen_tuning_run_folder()
     with open(os.path.join(path, 'indexes.json'), 'w') as f:
         json.dump([i.to_dict() for i in p], f)
+
+    with open(os.path.join(path, 'meta.json'), 'w') as f:
+        json.dump({
+            'workload': workload,
+            'time': end_time - start_time
+        }, f)
+
+if __name__ == '__main__':
     
+    pass
     
     
