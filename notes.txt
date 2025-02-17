@@ -19,3 +19,9 @@ For query planner computations, perhaps remove top-five largest costs
 
 Prompt Notes:
     tell LLM to be conservative with memory usage, only index columns that will explicitly reduce latency
+
+
+Policy prompts can suggest compound indexes, index datastructures, etc.
+
+The main reason for query bandits is that it is not necessarily the case that multiple different queries can be stuffed into a prompt.
+    - bandit reward: number of recommended indexes

@@ -1,4 +1,4 @@
-Given a SQL query and a SQL table schema, choose what columns in the table should be indexed so as to reduce the latency of the specified query. If no indexes are needed, output an empty list []
+Given a SQL query and a SQL table schema, choose what columns in the table should be indexed so as to reduce the latency of the specified query. If no indexes are needed, output an empty list []. Do not recommend indexes for tables other than the one specified in the schema.
 
 The query is given below:
 {query}

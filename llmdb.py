@@ -292,36 +292,38 @@ class Workload:
 
 if __name__ == '__main__':
     #vectorize_workload('tpcds')
-    w = Workload('job')
+    w = Workload('tpcds')
     p = w.table_policies(algo='top_k')
+    
 
     with open('prompts/actor/system.txt') as f, \
             open('prompts/actor/user.txt') as f1, \
             open('prompts/actor/critic_response.txt') as f2:
         
         sys, user = f.read(), f1.read()
-        query = '''SELECT MIN(mi.info) AS movie_budget, MIN(mi_idx.info) AS movie_votes, MIN(n.name) AS male_writer, MIN(t.title) AS violent_movie_title FROM cast_info AS ci, info_type AS it1, info_type AS it2, keyword AS k, movie_info AS mi, movie_info_idx AS mi_idx, movie_keyword AS mk, name AS n, title AS t WHERE ci.note IN ('(writer)', '(head writer)', '(written by)', '(story)', '(story editor)') AND it1.info = 'genres' AND it2.info = 'votes' AND k.keyword IN ('murder', 'blood', 'gore', 'death', 'female-nudity') AND mi.info = 'Horror' AND n.gender = 'm' AND t.id = mi.movie_id AND t.id = mi_idx.movie_id AND t.id = ci.movie_id AND t.id = mk.movie_id AND ci.movie_id = mi.movie_id AND ci.movie_id = mi_idx.movie_id AND ci.movie_id = mk.movie_id AND mi.movie_id = mi_idx.movie_id AND mi.movie_id = mk.movie_id AND mi_idx.movie_id = mk.movie_id AND n.id = ci.person_id AND it1.id = mi.info_type_id AND it2.id = mi_idx.info_type_id AND k.id = mk.keyword_id'''
+        query = '''SELECT ps_partkey, SUM(ps_supplycost * ps_availqty) AS value FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'mozambique' GROUP BY ps_partkey HAVING SUM(ps_supplycost * ps_availqty) > (SELECT SUM(ps_supplycost * ps_availqty) * 0.0001000000 FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'mozambique') ORDER BY value DESC'''
         schema = """
-CREATE TABLE person_info (
-    id integer NOT NULL PRIMARY KEY,
-    person_id integer NOT NULL,
-    info_type_id integer NOT NULL,
-    info text NOT NULL,
-    note text
+CREATE TABLE partsupp
+(
+    ps_partkey     BIGINT not null,
+    ps_suppkey     BIGINT not null,
+    ps_availqty    BIGINT not null,
+    ps_supplycost  DOUBLE PRECISION  not null,
+    ps_comment     VARCHAR(199) not null
 )
 """
         user = user.format(query = query, 
             schema = schema,
-            table_name = "person_info",
+            table_name = "partsupp",
             critic_response = "")
         
-        
+        '''
         resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user)
         
         print(resp)
         print('-'*60)
         print(parse_indexes_from_gpt(resp))
-        
+        '''
     
     '''
     with open('tpcds_schema/query_vis.json', 'w') as f:
