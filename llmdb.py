@@ -85,6 +85,24 @@ def load_workload_schema_embeddings(workload:str) -> dict:
 def parse_indexes_from_gpt(response:str) -> typing.List:
     return json.loads(re.findall('(?<=```json)[^`]+(?=```)', response)[0])
 
+def parse_tables_in_query(query:str) -> typing.Set[str]:
+    try:
+
+        return {i.this.name for i in sqlglot.parse(query)[0].find_all(sqlglot.exp.Table)}
+    
+    except sqlglot.errors.ParseError:
+        return {i for j in re.findall('(?<=from)\s*[\w_]+(?:\s*,\s*[\w_]+)*', query.lower())
+                for i in re.split('\s*,\s*', j)}
+
+
+def workload_query_table_mappings(workload:str) -> None:
+    with open(f'{workload}_schema/query_table_mappings.json', 'w') as f:
+        json.dump({a:[*parse_tables_in_query(b.sql())] for a, b in parse_workload(workload).items()}, f)
+
+def load_workload_query_table_mappings(workload:str) -> dict:
+    with open(f'{workload}_schema/query_table_mappings.json') as f:
+        return {a:set(b) for a, b in json.load(f).items()}
+
 class Policy:
     def __init__(self, 
             table:str, 
@@ -118,6 +136,7 @@ class Workload:
         self.tables = parse_workload_schema(workload)
         self._query_embeddings = load_workload_embeddings(workload)
         self._table_embeddings = load_workload_schema_embeddings(workload)
+        self._query_table_mappings = load_workload_query_table_mappings(workload)
         assert self.query_num == len(self._query_embeddings)
         assert self.table_num == len(self._table_embeddings)
 
@@ -200,9 +219,12 @@ class Workload:
         results = []
         for a, b in self._table_embeddings.items():
             emb = [(j, k, 1 - cos(torch.tensor(b), torch.tensor(k))) 
-                    for j, k in self.query_embeddings if filters[self.workload](j)]
+                    for j, k in self.query_embeddings \
+                        if filters[self.workload](j) and {a}&self._query_table_mappings[j]]
+            
             queries, _, emb_dist = zip(*sorted(emb, key=lambda x:x[-1])[:k])
-            print(a, queries, probs:=s_max(torch.tensor(emb_dist)*-1))
+            probs = s_max(torch.tensor(emb_dist)*-1)
+            print(a, queries, probs)
             print('-'*5)
             results.append(Policy(a, queries, probs, self))
         
@@ -291,30 +313,57 @@ class Workload:
 
 
 if __name__ == '__main__':
-    #vectorize_workload('tpcds')
-    w = Workload('tpcds')
+    w = Workload('tpch')
     p = w.table_policies(algo='top_k')
-    
+
 
     with open('prompts/actor/system.txt') as f, \
             open('prompts/actor/user.txt') as f1, \
             open('prompts/actor/critic_response.txt') as f2:
         
         sys, user = f.read(), f1.read()
-        query = '''SELECT ps_partkey, SUM(ps_supplycost * ps_availqty) AS value FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'mozambique' GROUP BY ps_partkey HAVING SUM(ps_supplycost * ps_availqty) > (SELECT SUM(ps_supplycost * ps_availqty) * 0.0001000000 FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'mozambique') ORDER BY value DESC'''
+        query = '''\nSELECT Substr(w_warehouse_name, 1, 20), \n               sm_type, \n               web_name, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk <= 30 ) THEN 1 \n                     ELSE 0 \n                   END) AS `30 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 30 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 60 ) THEN 1 \n                     ELSE 0 \n                   END) AS `31-60 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 60 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 90 ) THEN 1 \n                     ELSE 0 \n                   END) AS `61-90 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 90 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 120 ) THEN \n                     1 \n                     ELSE 0 \n                   END) AS `91-120 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 120 ) THEN 1 \n                     ELSE 0 \n                   END) AS `>120 days` \nFROM   web_sales, \n       warehouse, \n       ship_mode, \n       web_site, \n       date_dim \nWHERE  d_month_seq BETWEEN 1222 AND 1222 + 11 \n       AND ws_ship_date_sk = d_date_sk \n       AND ws_warehouse_sk = w_warehouse_sk \n       AND ws_ship_mode_sk = sm_ship_mode_sk \n       AND ws_web_site_sk = web_site_sk \nGROUP  BY Substr(w_warehouse_name, 1, 20), \n          sm_type, \n          web_name \nORDER  BY Substr(w_warehouse_name, 1, 20), \n          sm_type, \n          web_name\nLIMIT 100; \n'''
         schema = """
-CREATE TABLE partsupp
-(
-    ps_partkey     BIGINT not null,
-    ps_suppkey     BIGINT not null,
-    ps_availqty    BIGINT not null,
-    ps_supplycost  DOUBLE PRECISION  not null,
-    ps_comment     VARCHAR(199) not null
+CREATE TABLE catalog_sales (
+    cs_sold_date_sk bigint(11),
+    cs_sold_time_sk bigint(11),
+    cs_ship_date_sk bigint(11),
+    cs_bill_customer_sk bigint(11),
+    cs_bill_cdemo_sk bigint(11),
+    cs_bill_hdemo_sk bigint(11),
+    cs_bill_addr_sk bigint(11),
+    cs_ship_customer_sk bigint(11),
+    cs_ship_cdemo_sk bigint(11),
+    cs_ship_hdemo_sk bigint(11),
+    cs_ship_addr_sk bigint(11),
+    cs_call_center_sk bigint(11),
+    cs_catalog_page_sk bigint(11),
+    cs_ship_mode_sk bigint(11),
+    cs_warehouse_sk bigint(11),
+    cs_item_sk bigint(11),
+    cs_promo_sk bigint(11),
+    cs_order_number bigint(11),
+    cs_quantity bigint(11),
+    cs_wholesale_cost decimal(7,2),
+    cs_list_price decimal(7,2),
+    cs_sales_price decimal(7,2),
+    cs_ext_discount_amt decimal(7,2),
+    cs_ext_sales_price decimal(7,2),
+    cs_ext_wholesale_cost decimal(7,2),
+    cs_ext_list_price decimal(7,2),
+    cs_ext_tax decimal(7,2),
+    cs_coupon_amt decimal(7,2),
+    cs_ext_ship_cost decimal(7,2),
+    cs_net_paid decimal(7,2),
+    cs_net_paid_inc_tax decimal(7,2),
+    cs_net_paid_inc_ship decimal(7,2),
+    cs_net_paid_inc_ship_tax decimal(7,2),
+    cs_net_profit decimal(7,2)
 )
 """
         user = user.format(query = query, 
             schema = schema,
-            table_name = "partsupp",
+            table_name = "catalog_sales",
             critic_response = "")
         
         '''
@@ -325,14 +374,3 @@ CREATE TABLE partsupp
         print(parse_indexes_from_gpt(resp))
         '''
     
-    '''
-    with open('tpcds_schema/query_vis.json', 'w') as f:
-        json.dump({a:b.sql() for a, b in w.queries.items()}, f, indent=4)
-    '''
-    '''
-    c = w.query_costs_norm()
-    print('tpch final cost', c)
-    w = Workload('job')
-    c = w.query_costs_norm()
-    print('job final cost', c)
-    '''

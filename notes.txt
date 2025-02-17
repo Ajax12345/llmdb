@@ -25,3 +25,9 @@ Policy prompts can suggest compound indexes, index datastructures, etc.
 
 The main reason for query bandits is that it is not necessarily the case that multiple different queries can be stuffed into a prompt.
     - bandit reward: number of recommended indexes
+
+Ideally, index size consumption should be a parameter of the reward function
+    - However, the prompts themselves can be update to tell the agent to be mindful of memory consumption.
+
+Analyze workload to find queries that are pulling from a specific table.
+    - Then, use vector distance to seed the bandit probabilities
