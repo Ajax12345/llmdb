@@ -12,6 +12,7 @@ tpch setup:
     ./dbgen -s 3 -f
 
 https://dbgroup.cs.tsinghua.edu.cn/ligl/papers/tutorial-llm-meets-db.pdf
+https://github.com/cfoh/Multi-Armed-Bandit-Example/tree/main/ucb
 
 For query planner computations, perhaps remove top-five largest costs
 
@@ -31,3 +32,5 @@ Ideally, index size consumption should be a parameter of the reward function
 
 Analyze workload to find queries that are pulling from a specific table.
     - Then, use vector distance to seed the bandit probabilities
+
+Policy bandit reward: delta change in index size

@@ -8,7 +8,8 @@ import matplotlib.colors as mcolors
 import numpy as np, mysql_conn
 import warnings, functools
 import time, torch, torch.nn
-import contextlib
+import contextlib, random
+import datetime
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -103,27 +104,114 @@ def load_workload_query_table_mappings(workload:str) -> dict:
     with open(f'{workload}_schema/query_table_mappings.json') as f:
         return {a:set(b) for a, b in json.load(f).items()}
 
+
+def gen_tuning_run_folder() -> str:
+    d = datetime.datetime.now()
+    path = f'tuning/run_{d.year}-{d.month}-{d.day}_{d.hour}_{d.minute}'
+    os.mkdir(path)
+    return path
+
+class B1_Bandit:
+    def __init__(self, arms:int, 
+                 cold_start:int = 0, 
+                 probs:typing.List[float] = None) -> None:
+        
+        self.arms, self.probs = arms, probs
+        self.cold_start = cold_start
+        self.slots = {i:[] for i in range(arms)}
+        self.rounds = 0
+
+    def update(self, arm:int, reward:float) -> None:
+        self.slots[arm].append(reward)
+        self.rounds += 1
+    
+    def get_arm(self) -> int:
+        if self.rounds < self.cold_start:
+            w = self.probs
+
+        else:
+            s_max = torch.nn.Softmax()
+            w = s_max(torch.tensor([sum(self.slots[i])/self.rounds for i in range(self.arms)])).numpy().tolist()
+        
+        print(w)
+        return random.choices([*range(self.arms)], w, k=1)[0]
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(arms={self.arms}, cold_start={self.cold_start})'
+
 class Policy:
     def __init__(self, 
             table:str, 
             queries:typing.List[str], 
             probabilities:torch.tensor, 
-            workload:'Workload') -> None:
+            workload:'Workload',
+            config:dict) -> None:
         
         self.table = table
         self.queries = queries
         self.probabilities = probabilities
         self.workload = workload
+        self.config = config
+        self.bandit = B1_Bandit(len(self.queries), 
+            cold_start=self.config['cold_start'],
+            probs = self.probabilities)
 
-    @property
-    def table_columns(self) -> typing.List[str]:
+        self.table_columns = self.get_table_columns()
+        self.chosen_indexes = []
+
+
+    def get_table_columns(self) -> typing.List[str]:
         return [i.this.this for i in self.workload.tables[self.table].this.expressions]
 
     def action(self) -> typing.List[str]:
-        '''
-        Ensure that recommended columns from GPT actually exist in the table
-        Remove any explicit aliasing in column recommendation i.e table.col => col
-        '''
+        with open('prompts/actor/system.txt') as f, \
+            open('prompts/actor/user.txt') as f1, \
+            open('prompts/actor/critic_response.txt') as f2:
+        
+            sys, user = f.read(), f1.read()
+        
+        chosen_arm = self.bandit.get_arm()
+        query = self.queries[chosen_arm]
+
+        user_prompt = user.format(
+            query = self.workload.queries[query].sql(), 
+            schema = self.workload.tables[self.table].sql(),
+            table_name = self.table,
+            critic_response = ""
+        )
+        
+        print(f'user prompt here for table: {self.table}')
+        print(user_prompt)
+        resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user_prompt)
+        print('-'*60)
+        print(resp)
+        _ind = parse_indexes_from_gpt(resp)
+        _indexes = [j for i in _ind if (j:=re.sub('^\w+\.', '', i)) in self.table_columns]
+
+        if not _indexes:
+            reward = -2
+        
+        elif not self.chosen_indexes:
+            reward = 1
+        
+        elif len(self.chosen_indexes[-1]) == len(_indexes):
+            reward = 0.5
+        
+        else:
+            reward = len(_indexes) - len(self.chosen_indexes[-1])
+        
+        print('reward', reward)
+        print('+'*60)
+        self.bandit.update(chosen_arm, reward)
+        self.chosen_indexes.append(_indexes)
+        return _indexes
+
+    def to_dict(self) -> dict:
+        return {
+            'table': self.table,
+            'indexes': self.chosen_indexes
+        }
+
     
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.table})'
@@ -215,6 +303,8 @@ class Workload:
     def gen_policy_top_k(self, filters:dict, k:int) -> typing.List[Policy]:
         cos = torch.nn.CosineSimilarity(dim = 0)
         s_max = torch.nn.Softmax()
+        with open('tuning/config.json') as f:
+            tuning_config = json.load(f)
 
         results = []
         for a, b in self._table_embeddings.items():
@@ -226,7 +316,7 @@ class Workload:
             probs = s_max(torch.tensor(emb_dist)*-1)
             print(a, queries, probs)
             print('-'*5)
-            results.append(Policy(a, queries, probs, self))
+            results.append(Policy(a, queries, probs, self, tuning_config['policy']))
         
         return results
 
@@ -311,59 +401,38 @@ class Workload:
         plt.suptitle(f'Workload: {self.workload.upper()}')
         plt.show()
 
-
-if __name__ == '__main__':
-    w = Workload('tpch')
-    p = w.table_policies(algo='top_k')
-
-
+def test_prompts() -> None:
     with open('prompts/actor/system.txt') as f, \
             open('prompts/actor/user.txt') as f1, \
             open('prompts/actor/critic_response.txt') as f2:
         
         sys, user = f.read(), f1.read()
-        query = '''\nSELECT Substr(w_warehouse_name, 1, 20), \n               sm_type, \n               web_name, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk <= 30 ) THEN 1 \n                     ELSE 0 \n                   END) AS `30 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 30 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 60 ) THEN 1 \n                     ELSE 0 \n                   END) AS `31-60 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 60 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 90 ) THEN 1 \n                     ELSE 0 \n                   END) AS `61-90 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 90 ) \n                          AND ( ws_ship_date_sk - ws_sold_date_sk <= 120 ) THEN \n                     1 \n                     ELSE 0 \n                   END) AS `91-120 days`, \n               Sum(CASE \n                     WHEN ( ws_ship_date_sk - ws_sold_date_sk > 120 ) THEN 1 \n                     ELSE 0 \n                   END) AS `>120 days` \nFROM   web_sales, \n       warehouse, \n       ship_mode, \n       web_site, \n       date_dim \nWHERE  d_month_seq BETWEEN 1222 AND 1222 + 11 \n       AND ws_ship_date_sk = d_date_sk \n       AND ws_warehouse_sk = w_warehouse_sk \n       AND ws_ship_mode_sk = sm_ship_mode_sk \n       AND ws_web_site_sk = web_site_sk \nGROUP  BY Substr(w_warehouse_name, 1, 20), \n          sm_type, \n          web_name \nORDER  BY Substr(w_warehouse_name, 1, 20), \n          sm_type, \n          web_name\nLIMIT 100; \n'''
+        query = '''SELECT l_returnflag, l_linestatus, SUM(l_quantity) AS sum_qty, SUM(l_extendedprice) AS sum_base_price, SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price, SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge, AVG(l_quantity) AS avg_qty, AVG(l_extendedprice) AS avg_price, AVG(l_discount) AS avg_disc, COUNT(*) AS count_order FROM lineitem WHERE l_shipdate <= CAST('1994-7-17' AS DATE) - INTERVAL '108' day GROUP BY l_returnflag, l_linestatus ORDER BY l_returnflag, l_linestatus'''
         schema = """
-CREATE TABLE catalog_sales (
-    cs_sold_date_sk bigint(11),
-    cs_sold_time_sk bigint(11),
-    cs_ship_date_sk bigint(11),
-    cs_bill_customer_sk bigint(11),
-    cs_bill_cdemo_sk bigint(11),
-    cs_bill_hdemo_sk bigint(11),
-    cs_bill_addr_sk bigint(11),
-    cs_ship_customer_sk bigint(11),
-    cs_ship_cdemo_sk bigint(11),
-    cs_ship_hdemo_sk bigint(11),
-    cs_ship_addr_sk bigint(11),
-    cs_call_center_sk bigint(11),
-    cs_catalog_page_sk bigint(11),
-    cs_ship_mode_sk bigint(11),
-    cs_warehouse_sk bigint(11),
-    cs_item_sk bigint(11),
-    cs_promo_sk bigint(11),
-    cs_order_number bigint(11),
-    cs_quantity bigint(11),
-    cs_wholesale_cost decimal(7,2),
-    cs_list_price decimal(7,2),
-    cs_sales_price decimal(7,2),
-    cs_ext_discount_amt decimal(7,2),
-    cs_ext_sales_price decimal(7,2),
-    cs_ext_wholesale_cost decimal(7,2),
-    cs_ext_list_price decimal(7,2),
-    cs_ext_tax decimal(7,2),
-    cs_coupon_amt decimal(7,2),
-    cs_ext_ship_cost decimal(7,2),
-    cs_net_paid decimal(7,2),
-    cs_net_paid_inc_tax decimal(7,2),
-    cs_net_paid_inc_ship decimal(7,2),
-    cs_net_paid_inc_ship_tax decimal(7,2),
-    cs_net_profit decimal(7,2)
+CREATE TABLE lineitem
+(
+    l_orderkey    BIGINT not null,
+    l_partkey     BIGINT not null,
+    l_suppkey     BIGINT not null,
+    l_linenumber  BIGINT not null,
+    l_quantity    DOUBLE PRECISION not null,
+    l_extendedprice  DOUBLE PRECISION not null,
+    l_discount    DOUBLE PRECISION not null,
+    l_tax         DOUBLE PRECISION not null,
+    l_returnflag  CHAR(1) not null,
+    l_linestatus  CHAR(1) not null,
+    l_shipdate    DATE not null,
+    l_commitdate  DATE not null,
+    l_receiptdate DATE not null,
+    l_shipinstruct CHAR(25) not null,
+    l_shipmode     CHAR(10) not null,
+    l_comment      VARCHAR(44) not null
+)
 )
 """
         user = user.format(query = query, 
             schema = schema,
-            table_name = "catalog_sales",
+            table_name = "lineitem",
             critic_response = "")
         
         '''
@@ -373,4 +442,23 @@ CREATE TABLE catalog_sales (
         print('-'*60)
         print(parse_indexes_from_gpt(resp))
         '''
+        bandit = B1_Bandit(5, cold_start = 2, probs = [0.2114, 0.1976, 0.1973, 0.1970, 0.1967])
+        for i in [1, 1, -1, 1]:
+            a = bandit.get_arm()
+            print(f'arm: {a}, reward: {i}')
+            bandit.update(a, i)
+
+if __name__ == '__main__':
+    w = Workload('tpch')
+    p = w.table_policies(algo='top_k')
+    for _ in range(3):
+        for i in p:
+            i.action()
+
+    
+    path = gen_tuning_run_folder()
+    with open(os.path.join(path, 'indexes.json'), 'w') as f:
+        json.dump([i.to_dict() for i in p], f)
+    
+    
     

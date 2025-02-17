@@ -1,0 +1,5 @@
+{
+    "policy":{
+        "cold_start": 2
+    }
+}
