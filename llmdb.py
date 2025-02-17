@@ -159,6 +159,8 @@ class Policy:
         self.table_columns = self.get_table_columns()
         self.chosen_indexes = []
 
+    def fetch_index_col_schema(self, columns:typing.List[str]) -> typing.List[str]:
+        return [i.sql() for i in self.workload.tables[self.table].this.expressions if i.this.this in columns]
 
     def get_table_columns(self) -> typing.List[str]:
         return [i.this.this for i in self.workload.tables[self.table].this.expressions]
@@ -469,6 +471,8 @@ def generate_indexes(workload:str) -> None:
 
 if __name__ == '__main__':
     
-    pass
+    w = Workload('tpch')
+    p = w.table_policies(algo='top_k')
+    print(p[0].fetch_index_col_schema(["n_nationkey", "n_name", "n_regionkey"]))
     
     

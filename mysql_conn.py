@@ -244,28 +244,42 @@ class MySQL:
 
 
     @DB_EXISTS()
-    def apply_index_configuration(self, indices:typing.List[int]) -> None:
+    def apply_index_configuration(self, indexes:dict) -> None:
         col_state = self.get_columns_from_database()
-        assert len(indices) == len(col_state)
-        for i, (ind_state, col_data) in enumerate(zip(indices, col_state), 1):
-            if col_data['INDEX_NAME'] is not None and col_data['INDEX_NAME'].lower().startswith('PRIMARY'.lower()):
-                continue
+        d = collections.defaultdict(dict)
+        
+        for i in col_state:
+            d[i['TABLE_NAME']][i['COLUMN_NAME']] = i
+        
+        for a, b in d.items():
+            for j, k in b.items():
+                if j not in indexes.get(a, []) and k['INDEX_NAME'] is not None:
+                    self.cur.execute(f"drop index {k['INDEX_NAME']} on {a}")
+                    print('dropped non-match')
 
-            if ind_state:
-                if col_data['INDEX_NAME'] is None:
-                    if col_data['DATA_TYPE'].lower() == 'text':
-                        self.cur.execute(f'create index ATLAS_INDEX_{i} on {col_data["TABLE_NAME"]}({col_data["COLUMN_NAME"]}({min(20, int(col_data["CHARACTER_MAXIMUM_LENGTH"]))}))')
+        for a, b in indexes.items():
+            for j in b:
+                if d[a][j]['INDEX_NAME'] is None:
+                    if d[a][j]['DATA_TYPE'].lower() == 'text':
+                        self.cur.execute(f'create index LLMDB_INDEX_{j} on {a}({j}({min(20, int(d[a][j]["CHARACTER_MAXIMUM_LENGTH"]))}))')
 
                     else:
-                        self.cur.execute(f'create index ATLAS_INDEX_{i} on {col_data["TABLE_NAME"]}({col_data["COLUMN_NAME"]})')
-
-            else:
-                if col_data['INDEX_NAME'] is not None and not col_data['INDEX_NAME'].lower().startswith('PRIMARY'.lower()):
-                    try:
-                        self.cur.execute(f'drop index {col_data["INDEX_NAME"]} on {col_data["TABLE_NAME"]}')
-                    except:
-                        pass
+                        self.cur.execute(f'create index LLMDB_INDEX_{j} on {a}({j})')
+                else:
+                    print('index already exists, skipping')
+       
         self.commit() 
+
+    @DB_EXISTS()
+    def compute_index_storage(self) -> float:
+        self.cur.execute('''
+        SELECT database_name, table_name, index_name,
+        ROUND(stat_value * @@innodb_page_size / 1024 / 1024, 2) size_in_mb
+        FROM mysql.innodb_index_stats
+        WHERE stat_name = 'size' AND index_name != 'PRIMARY'
+        ORDER BY size_in_mb DESC;
+        ''')
+        return sum(i['size_in_mb'] for i in self.cur if i['index_name'] != 'GEN_CLUST_INDEX' and i['database_name'] == self.database)
 
     @DB_EXISTS()
     def drop_all_indices(self) -> None:
@@ -370,7 +384,12 @@ class MySQL_CC(MySQL):
 
 if __name__ == '__main__':
     with MySQL(database = "tpch") as conn:
-        
-        
-        print(conn.memory_size('gb'))
+        #conn.apply_index_configuration({})
+        #print(conn.compute_index_storage())
+        conn.apply_index_configuration({'orders': ['o_orderkey'], 'customer': ['c_custkey', 'c_name', 'c_nationkey'], 'part': ['p_partkey', 'p_brand']})
+        cols = {i['TABLE_NAME'] for i in conn.get_columns_from_database()}
+        for i in cols:
+            print(i, [j['Key_name'] for j in conn.get_indices(i)])
+
+        print(conn.compute_index_storage())
         
