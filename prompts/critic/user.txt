@@ -2,47 +2,15 @@ Included in this prompt are a series of proposed database table column index con
 
 For more information on the datatypes of the columns that are being indexed, below is a SQL column creation schema:
 
-customer.c_acctbal DOUBLE NOT NULL
-customer.c_custkey BIGINT NOT NULL
-customer.c_nationkey INT NOT NULL
-customer.c_phone CHAR(15) NOT NULL
-lineitem.l_commitdate DATE NOT NULL
-lineitem.l_linestatus CHAR(1) NOT NULL
-lineitem.l_orderkey BIGINT NOT NULL
-lineitem.l_receiptdate DATE NOT NULL
-lineitem.l_returnflag CHAR(1) NOT NULL
-lineitem.l_shipdate DATE NOT NULL
-lineitem.l_shipmode CHAR(10) NOT NULL
-nation.n_name CHAR(25) NOT NULL
-nation.n_nationkey INT NOT NULL
-nation.n_regionkey INT NOT NULL
-orders.o_custkey BIGINT NOT NULL
-orders.o_orderdate DATE NOT NULL
-orders.o_orderkey BIGINT NOT NULL
-orders.o_orderpriority CHAR(15) NOT NULL
-orders.o_totalprice DOUBLE NOT NULL
-part.p_brand CHAR(10) NOT NULL
-part.p_name VARCHAR(55) NOT NULL
-part.p_partkey BIGINT NOT NULL
-part.p_size INT NOT NULL
-part.p_type VARCHAR(25) NOT NULL
-partsupp.ps_partkey BIGINT NOT NULL
-partsupp.ps_suppkey BIGINT NOT NULL
-partsupp.ps_supplycost DOUBLE NOT NULL
-region.r_name CHAR(25) NOT NULL
-supplier.s_name CHAR(25) NOT NULL
-supplier.s_nationkey INT NOT NULL
-supplier.s_suppkey BIGINT NOT NULL
+{schema}
 
 Below are the proposed columns to be indexed, along with the reward observed after the indexes are deployed and the associated storage size:
 
-configuration: nation.n_nationkey, nation.n_name, nation.n_regionkey, part.p_partkey, part.p_name, supplier.s_suppkey, partsupp.ps_partkey, partsupp.ps_suppkey, partsupp.ps_supplycost, customer.c_custkey, customer.c_nationkey, customer.c_acctbal, customer.c_phone, orders.o_orderkey, orders.o_custkey, orders.o_totalprice, orders.o_orderdate, lineitem.l_shipdate, lineitem.l_returnflag, lineitem.l_linestatus; reward: 17.39; storage size: 1430.5 MB
-configuration: nation.n_nationkey, nation.n_regionkey, nation.n_name, part.p_brand, part.p_type, part.p_size, partsupp.ps_suppkey, customer.c_custkey, customer.c_nationkey, orders.o_orderdate, orders.o_orderpriority, lineitem.l_orderkey, lineitem.l_shipmode, lineitem.l_commitdate, lineitem.l_receiptdate, lineitem.l_shipdate; reward: 4.12; storage size: 2027.05 MB
-configuration: nation.n_nationkey, region.r_name, part.p_brand, part.p_type, part.p_size, supplier.s_nationkey, supplier.s_name, partsupp.ps_partkey, partsupp.ps_suppkey, partsupp.ps_supplycost, orders.o_custkey, orders.o_orderdate, lineitem.l_orderkey, lineitem.l_shipmode, lineitem.l_commitdate, lineitem.l_receiptdate, lineitem.l_shipdate; reward: 6.62; storage size: 2073.05 MB
+{configuration}
 
 Output a list of columns from across the different proposed configurations that contribute most to maximizing the reward, while being mindful of the storage space required when these columns are indexed.
 Also, output a list of columns that should not be indexed. These columns either fail to contribute significantly to maximizing the reward or have too high storage space overhead.
 
 ```json
-{"columns_to_index": [<COLUMNS THAT SHOULD BE INDEXED>], "columns_not_to_index": [<COLUMNS THAT SHOULD NOT BE INDEXED>]}
+{{"columns_to_index": [<COLUMNS THAT SHOULD BE INDEXED>], "columns_not_to_index": [<COLUMNS THAT SHOULD NOT BE INDEXED>]}}
 ```

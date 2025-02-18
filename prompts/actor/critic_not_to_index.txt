@@ -1,0 +1,1 @@
+Also, analysis has also shown that indexing columns {columns_not_to_index} leads to poor database performance. Do not index any of the columns in that list.

@@ -1,1 +1,0 @@
-Prior analysis has shown that indexing columns {recommended_columns} also improve latency. Strongly consider including the indexes in that list in your recommendations if they will improve latency in conjunction with the new recommendations.

@@ -9,7 +9,7 @@ import numpy as np, mysql_conn
 import warnings, functools
 import time, torch, torch.nn
 import contextlib, random
-import datetime
+import datetime, ast
 
 def parse_schema(workload:str) -> typing.List:
     with open(os.path.join(f'{workload}_schema', 'schema.sql')) as f:
@@ -84,7 +84,7 @@ def load_workload_schema_embeddings(workload:str) -> dict:
         return json.load(f)
 
 def parse_indexes_from_gpt(response:str) -> typing.List:
-    return json.loads(re.findall('(?<=```json)[^`]+(?=```)', response)[0])
+    return ast.literal_eval(re.findall('(?<=```json)[^`]+(?=```)', response)[0])
 
 def parse_tables_in_query(query:str) -> typing.Set[str]:
     try:
@@ -160,6 +160,7 @@ class Policy:
 
         self.table_columns = self.get_table_columns()
         self.chosen_indexes = []
+        self.critic_evaluation = collections.defaultdict(set)
 
     def fetch_index_col_schema(self, columns:typing.List[str]) -> typing.List[str]:
         return [i.sql() for i in self.workload.tables[self.table].this.expressions if i.this.this in columns]
@@ -167,21 +168,43 @@ class Policy:
     def get_table_columns(self) -> typing.List[str]:
         return [i.this.this for i in self.workload.tables[self.table].this.expressions]
 
-    def action(self) -> typing.List[str]:
+    def action(self, retries:int = 2) -> typing.List[str]:
+        for _ in range(retries):
+            try:
+                return self._action()
+            except Exception as e:
+                print('got exception in action retry', e)
+
+
+    def _action(self) -> typing.List[str]:
         with open('prompts/actor/system.txt') as f, \
             open('prompts/actor/user.txt') as f1, \
-            open('prompts/actor/critic_response.txt') as f2:
+            open('prompts/actor/critic_to_index.txt') as f2, \
+            open('prompts/actor/critic_not_to_index.txt') as f3:
         
             sys, user = f.read(), f1.read()
+
+            critic_to_index = f2.read()
+            critic_not_to_index = f3.read()
+
+        
         
         chosen_arm = self.bandit.get_arm()
         query = self.queries[chosen_arm]
+
+        critic_response = ""
+        if self.critic_evaluation['columns_to_index']:
+            critic_response += critic_to_index.format(columns_to_index = [*self.critic_evaluation['columns_to_index']])
+
+        if self.critic_evaluation['columns_not_to_index']:
+            critic_response += '\n\n'+critic_not_to_index.format(columns_not_to_index = [*self.critic_evaluation['columns_not_to_index']])
+
 
         user_prompt = user.format(
             query = self.workload.queries[query].sql(), 
             schema = self.workload.tables[self.table].sql(),
             table_name = self.table,
-            critic_response = ""
+            critic_response = critic_response
         )
         
         print(f'user prompt here for table: {self.table}')
@@ -198,11 +221,11 @@ class Policy:
         elif not self.chosen_indexes:
             reward = 1
         
-        elif len(self.chosen_indexes[-1]) == len(_indexes):
+        elif max(map(len, self.chosen_indexes)) == len(_indexes):
             reward = 0.5
         
         else:
-            reward = len(_indexes) - len(self.chosen_indexes[-1])
+            reward = len(_indexes) - max(map(len, self.chosen_indexes))
         
         print('reward', reward)
         print('+'*60)
@@ -219,6 +242,55 @@ class Policy:
     
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.table})'
+
+class Critic:
+    def __init__(self, policies:dict, evaluate_after:int = 3) -> None:
+        self.policies = policies
+        self.observations = []
+        self.evaluate_after = evaluate_after
+    
+    def evaluate(self, *args) -> None:
+        for _ in range(2):
+            try:
+                return self._evaluate(*args)
+            except Exception as e:
+                print('got exception in evaluate', e)
+
+
+    def _evaluate(self, recommendation:dict, reward:float, storage:float) -> None:
+        self.observations.append((recommendation, reward, storage))
+
+        if len(self.observations) <= self.evaluate_after:
+            return
+        
+        schema = '\n'.join(sorted({f'{a}.{j}' for i, *_ in self.observations \
+                    for a, b in i.items() for j in self.policies[a].fetch_index_col_schema(b)}))
+
+        configuration = '\n'.join(f'''configuration: {", ".join(f'{a}.{j}' for a, b in ind.items() for j in b)}; reward: {reward}; storage size: {storage} MB''' for ind, reward, storage in self.observations)
+        
+        with open('prompts/critic/system.txt') as f, \
+            open('prompts/critic/user.txt') as f1:
+        
+            sys, user = f.read(), f1.read()
+
+        user_prompt = user.format(
+            schema = schema,
+            configuration = configuration
+        )
+        print('in user prompt in critic')
+        print(user_prompt)
+        resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user_prompt)
+        print('resp in critic')
+        print(resp)
+        validations = parse_indexes_from_gpt(resp)
+        print('validations here', validations)
+        print('-'*50)
+
+        for a, b in validations.items():
+            for p in b:
+                tbl, col = p.split('.')
+                self.policies[tbl].critic_evaluation[a].add(col)
+
 
 
 class Workload:
@@ -463,7 +535,7 @@ CREATE TABLE lineitem
             print(f'arm: {a}, reward: {i}')
             bandit.update(a, i)
 
-def generate_indexes(workload:str) -> None:
+def test_generate_indexes(workload:str) -> None:
     start_time = time.time()
     w = Workload(workload)
     p = w.table_policies(algo='top_k')
@@ -482,12 +554,12 @@ def generate_indexes(workload:str) -> None:
             'time': end_time - start_time
         }, f)
 
-if __name__ == '__main__':
-    
+
+def test_critic() -> None:
+    '''
     w = Workload('tpch')
     p = w.table_policies(algo='top_k')
     pd = {i.table:i for i in p}
-    '''
     #print(p[0].fetch_index_col_schema(["n_nationkey", "n_name", "n_regionkey"]))
     
     w.reset_indexes()
@@ -530,7 +602,7 @@ if __name__ == '__main__':
 
 
         print('\n'.join(sorted({f'{a}.{j}' for t in data for a, b in t['tbl_ind_m'].items() for j in pd[a].fetch_index_col_schema(b)})))
-    '''
+    
     
     with open('prompts/critic/system.txt') as f, \
         open('prompts/critic/user.txt') as f1:
@@ -539,3 +611,47 @@ if __name__ == '__main__':
 
     resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user)
     print(resp)
+    '''
+
+def tune(epochs, iterations) -> None:
+    final_results = []
+    path = gen_tuning_run_folder()
+    for _ in range(epochs):
+        w = Workload('tpch')
+        p = w.table_policies(algo='top_k')
+        pd = {i.table:i for i in p}
+        critic = Critic(pd)
+        w.reset_indexes()
+        default_costs = w.query_costs()
+
+        results = []
+        for iteration in range(iterations):
+            print('iteration:', iteration + 1)
+            recommendations = {i.table:i.action() for i in p}
+            w.apply_index_configuration(recommendations)
+            c_costs = w.query_costs()
+            storage_consumption = float(w.index_storage_size())
+            reward = round(sum(((default_costs[a] - b) if b >= 0 else b)/default_costs[a] for a, b in c_costs.items()), 2)
+            critic.evaluate(recommendations, reward, storage_consumption)
+            results.append([reward, storage_consumption])
+
+        final_results.append(results)
+        with open(os.path.join(path, 'epochs.json'), 'w') as f:
+            json.dump(final_results, f)
+    
+
+    print('epoch data saved to: ', path)
+    '''
+    fig, [r, c, avg] = plt.subplots(nrows=1, ncols=3)
+    r.plot([a for a, _ in results])
+    c.plot([b for _, b in results])
+    avg.plot([a/b for a, b in results])
+    plt.show()
+    '''
+
+
+if __name__ == '__main__':
+    tune(5, 20)
+    
+    
+    

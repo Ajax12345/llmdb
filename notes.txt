@@ -16,10 +16,8 @@ https://github.com/cfoh/Multi-Armed-Bandit-Example/tree/main/ucb
 
 For query planner computations, perhaps remove top-five largest costs
 
-    - use a delta change in cost from initial (empty index) config to present
 
 Prompt Notes:
-    - tell LLM to be conservative with memory usage, only index columns that will explicitly reduce latency
     - remove reference to "Human"
     - over more iterations, have context window for info being sent to critic. That is, only feed it the last k iterations worth of data
 
@@ -32,10 +30,4 @@ The main reason for query bandits is that it is not necessarily the case that mu
 Ideally, index size consumption should be a parameter of the reward function
     - However, the prompts themselves can be update to tell the agent to be mindful of memory consumption.
 
-Analyze workload to find queries that are pulling from a specific table.
-    - Then, use vector distance to seed the bandit probabilities
-
-Policy bandit reward: delta change in index size
-
-Critic has to be fed column data for all indexes ever recommended
-
+Have critic decide most impactful set of tables
