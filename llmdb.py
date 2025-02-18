@@ -114,14 +114,12 @@ def gen_tuning_run_folder() -> str:
 class B1_Bandit:
     def __init__(self, arms:int, 
                  cold_start:int = 0, 
-                 probs:typing.List[float] = None,
-                 u_t:float = 0.5) -> None:
+                 probs:typing.List[float] = None) -> None:
         
         self.arms, self.probs = arms, probs
         self.cold_start = cold_start
-        self.slots = {i:[] for i in range(arms)}
+        self.slots = {i:[1] for i in range(arms)}
         self.rounds = 0
-        self.u_t = u_t
 
     def update(self, arm:int, reward:float) -> None:
         self.slots[arm].append(reward)
@@ -133,7 +131,7 @@ class B1_Bandit:
 
         else:
             s_max = torch.nn.Softmax()
-            w = s_max(torch.tensor([(sum(self.slots[i]) or self.u_t)/self.rounds for i in range(self.arms)])).numpy().tolist()
+            w = s_max(torch.tensor([sum(self.slots[i])/len(self.slots[i]) for i in range(self.arms)])).numpy().tolist()
         
         print(w)
         return random.choices([*range(self.arms)], w, k=1)[0]
@@ -160,7 +158,7 @@ class Policy:
 
         self.table_columns = self.get_table_columns()
         self.chosen_indexes = []
-        self.critic_evaluation = collections.defaultdict(set)
+        self.critic_evaluation = {i:0 for i in self.table_columns}
 
     def fetch_index_col_schema(self, columns:typing.List[str]) -> typing.List[str]:
         return [i.sql() for i in self.workload.tables[self.table].this.expressions if i.this.this in columns]
@@ -193,11 +191,11 @@ class Policy:
         query = self.queries[chosen_arm]
 
         critic_response = ""
-        if self.critic_evaluation['columns_to_index']:
-            critic_response += critic_to_index.format(columns_to_index = [*self.critic_evaluation['columns_to_index']])
+        if (columns_to_index:=[a for a, b in self.critic_evaluation.items() if b > 0]):
+            critic_response += critic_to_index.format(columns_to_index = columns_to_index)
 
-        if self.critic_evaluation['columns_not_to_index']:
-            critic_response += '\n\n'+critic_not_to_index.format(columns_not_to_index = [*self.critic_evaluation['columns_not_to_index']])
+        if (columns_not_to_index:=[a for a, b in self.critic_evaluation.items() if b < 0]):
+            critic_response += '\n\n'+critic_not_to_index.format(columns_not_to_index = columns_not_to_index)
 
 
         user_prompt = user.format(
@@ -214,22 +212,8 @@ class Policy:
         print(resp)
         _ind = parse_indexes_from_gpt(resp)
         _indexes = [j for i in _ind if (j:=re.sub('^\w+\.', '', i)) in self.table_columns]
-
-        if not _indexes:
-            reward = -2
-        
-        elif not self.chosen_indexes:
-            reward = 1
-        
-        elif max(map(len, self.chosen_indexes)) == len(_indexes):
-            reward = 0.5
-        
-        else:
-            reward = len(_indexes) - max(map(len, self.chosen_indexes))
-        
-        print('reward', reward)
         print('+'*60)
-        self.bandit.update(chosen_arm, reward)
+        self.bandit.update(chosen_arm, len(_indexes))
         self.chosen_indexes.append(_indexes)
         return _indexes
 
@@ -289,7 +273,7 @@ class Critic:
         for a, b in validations.items():
             for p in b:
                 tbl, col = p.split('.')
-                self.policies[tbl].critic_evaluation[a].add(col)
+                self.policies[tbl].critic_evaluation[col] += [-1, 1][a == 'columns_to_index']
 
 
 
@@ -651,7 +635,27 @@ def tune(epochs, iterations) -> None:
 
 
 if __name__ == '__main__':
-    tune(5, 20)
+    #tune(5, 20)
+    '''
+    results = []
+    for i in os.listdir('tuning'):
+        if i.startswith('run_2025-2-18'):
+            with open(os.path.join('tuning', i, 'epochs.json')) as f:
+                results.extend(json.load(f))
+
+    rewards = [[j[0] for j in i] for i in results]
+    costs = [[j[1] for j in i] for i in results]
     
+    fig, [r, c, avg] = plt.subplots(nrows=1, ncols=3)
+    r.plot(R:=[sum(i)/len(i) for i in zip(*rewards)])
+    c.plot(C:=[sum(i)/len(i) for i in zip(*costs)])
+    avg.plot([a/b for a, b in zip(R, C)])
+    plt.suptitle('Default Approach')
+    plt.show()
+    '''
+    w = Workload('tpch')
+    print(len({str(w.query_costs()) for _ in range(5)}))
+
     
+
     

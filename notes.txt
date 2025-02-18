@@ -31,3 +31,9 @@ Ideally, index size consumption should be a parameter of the reward function
     - However, the prompts themselves can be update to tell the agent to be mindful of memory consumption.
 
 Have critic decide most impactful set of tables
+
+
+To do:
+    - Add bandit for policy selection
+    - observation window truncation
+    - use single reward/storage_scale metric
