@@ -114,12 +114,14 @@ def gen_tuning_run_folder() -> str:
 class B1_Bandit:
     def __init__(self, arms:int, 
                  cold_start:int = 0, 
-                 probs:typing.List[float] = None) -> None:
+                 probs:typing.List[float] = None,
+                 u_t:float = 0.5) -> None:
         
         self.arms, self.probs = arms, probs
         self.cold_start = cold_start
         self.slots = {i:[] for i in range(arms)}
         self.rounds = 0
+        self.u_t = u_t
 
     def update(self, arm:int, reward:float) -> None:
         self.slots[arm].append(reward)
@@ -131,7 +133,7 @@ class B1_Bandit:
 
         else:
             s_max = torch.nn.Softmax()
-            w = s_max(torch.tensor([sum(self.slots[i])/self.rounds for i in range(self.arms)])).numpy().tolist()
+            w = s_max(torch.tensor([(sum(self.slots[i]) or self.u_t)/self.rounds for i in range(self.arms)])).numpy().tolist()
         
         print(w)
         return random.choices([*range(self.arms)], w, k=1)[0]
@@ -250,6 +252,17 @@ class Workload:
             'tables': self.table_num,
         }
     
+    def index_storage_size(self) -> float: 
+        with mysql_conn.MySQL(database=self.workload) as conn:
+            return conn.compute_index_storage()
+    
+    def reset_indexes(self) -> None:
+        self.apply_index_configuration({})
+        
+    def apply_index_configuration(self, indexes:dict) -> None:
+        with mysql_conn.MySQL(database=self.workload) as conn:
+            conn.apply_index_configuration(indexes)
+        
     def query_costs(self) -> dict:
         def tpch_filter(a:str) -> bool:
             return True
@@ -316,8 +329,8 @@ class Workload:
             
             queries, _, emb_dist = zip(*sorted(emb, key=lambda x:x[-1])[:k])
             probs = s_max(torch.tensor(emb_dist)*-1)
-            print(a, queries, probs)
-            print('-'*5)
+            #print(a, queries, probs)
+            #print('-'*5)
             results.append(Policy(a, queries, probs, self, tuning_config['policy']))
         
         return results
@@ -473,6 +486,56 @@ if __name__ == '__main__':
     
     w = Workload('tpch')
     p = w.table_policies(algo='top_k')
-    print(p[0].fetch_index_col_schema(["n_nationkey", "n_name", "n_regionkey"]))
+    pd = {i.table:i for i in p}
+    '''
+    #print(p[0].fetch_index_col_schema(["n_nationkey", "n_name", "n_regionkey"]))
     
+    w.reset_indexes()
+
+    default_costs = w.query_costs()
+    print('default costs', default_costs)
+    row_by_row = []
+    with open('tuning/run_2025-2-17_13_46/indexes.json') as f:
+        data = [[(i['table'], j) for j in i['indexes']] for i in json.load(f)]
+        for i in zip(*data):
+            tbl_ind_m = dict(i)
+            all_ind = ', '.join(f'{a}.{j}' for a, b in i for j in b)
+            w.apply_index_configuration(tbl_ind_m)
+            c_costs = w.query_costs()
+            storage_consumption = float(w.index_storage_size())
+            print('c_costs here', c_costs)
+            cost_diff = {a:default_costs[a] - b for a, b in c_costs.items()}
+            row_by_row.append(D:={
+                'tbl_ind_m': tbl_ind_m,
+                'all_ind': all_ind,
+                'storage_consumption': storage_consumption,
+                'cost_diff': cost_diff,
+                'c_costs': c_costs,
+                'default_costs': default_costs
+            })
+            print(D)
+            print('-'*60)
+
+    with open('tuning/run_2025-2-17_13_46/critic_staging.json', 'w') as f:
+        json.dump(row_by_row, f)
+    '''
+    '''
+    with open('tuning/run_2025-2-17_13_46/critic_staging.json') as f:
+        data = json.load(f)
+        results = []
+        for i in data:
+            reward = round(sum(((i['default_costs'][a] - b) if b >= 0 else b)/i['default_costs'][a] for a, b in i['c_costs'].items()), 2)
+            results.append((i['all_ind'], reward, i['storage_consumption']))
+            print(f"configuration: {i['all_ind']}; reward: {reward}; storage size: {i['storage_consumption']} MB")
+
+
+        print('\n'.join(sorted({f'{a}.{j}' for t in data for a, b in t['tbl_ind_m'].items() for j in pd[a].fetch_index_col_schema(b)})))
+    '''
     
+    with open('prompts/critic/system.txt') as f, \
+        open('prompts/critic/user.txt') as f1:
+    
+        sys, user = f.read(), f1.read()
+
+    resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user)
+    print(resp)

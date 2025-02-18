@@ -19,7 +19,9 @@ For query planner computations, perhaps remove top-five largest costs
     - use a delta change in cost from initial (empty index) config to present
 
 Prompt Notes:
-    tell LLM to be conservative with memory usage, only index columns that will explicitly reduce latency
+    - tell LLM to be conservative with memory usage, only index columns that will explicitly reduce latency
+    - remove reference to "Human"
+    - over more iterations, have context window for info being sent to critic. That is, only feed it the last k iterations worth of data
 
 
 Policy prompts can suggest compound indexes, index datastructures, etc.
@@ -34,3 +36,6 @@ Analyze workload to find queries that are pulling from a specific table.
     - Then, use vector distance to seed the bandit probabilities
 
 Policy bandit reward: delta change in index size
+
+Critic has to be fed column data for all indexes ever recommended
+

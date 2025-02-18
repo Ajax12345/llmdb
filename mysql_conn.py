@@ -386,10 +386,13 @@ if __name__ == '__main__':
     with MySQL(database = "tpch") as conn:
         #conn.apply_index_configuration({})
         #print(conn.compute_index_storage())
-        conn.apply_index_configuration({'orders': ['o_orderkey'], 'customer': ['c_custkey', 'c_name', 'c_nationkey'], 'part': ['p_partkey', 'p_brand']})
+        
+        #conn.apply_index_configuration({'orders': ['o_orderkey'], 'customer': ['c_custkey', 'c_name', 'c_nationkey'], 'part': ['p_partkey', 'p_brand']})
+        conn.apply_index_configuration({})
         cols = {i['TABLE_NAME'] for i in conn.get_columns_from_database()}
         for i in cols:
             print(i, [j['Key_name'] for j in conn.get_indices(i)])
 
         print(conn.compute_index_storage())
+        
         

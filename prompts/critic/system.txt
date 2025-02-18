@@ -1,0 +1,1 @@
+Imagine you are a database administrator. You must evaluate different database table index configurations that have been produced by a reinforcement learning model and choose configurations that maximize the reward associated with the configuration, while taking into account the storage space required for each index.
