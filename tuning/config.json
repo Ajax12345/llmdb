@@ -1,5 +1,8 @@
 {
     "policy":{
-        "cold_start": 2
+        "cold_start": 10
+    },
+    "critic":{
+        "evaluate_after": 10
     }
 }

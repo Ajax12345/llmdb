@@ -601,10 +601,13 @@ def tune(epochs, iterations) -> None:
     final_results = []
     path = gen_tuning_run_folder()
     for _ in range(epochs):
+        with open('tuning/config.json') as f:
+            tuning_config = json.load(f)
+
         w = Workload('tpch')
         p = w.table_policies(algo='top_k')
         pd = {i.table:i for i in p}
-        critic = Critic(pd)
+        critic = Critic(pd, evaluate_after=tuning_config['critic']['evaluate_after'])
         w.reset_indexes()
         default_costs = w.query_costs()
 
@@ -635,13 +638,11 @@ def tune(epochs, iterations) -> None:
 
 
 if __name__ == '__main__':
-    #tune(5, 20)
-    '''
-    results = []
-    for i in os.listdir('tuning'):
-        if i.startswith('run_2025-2-18'):
-            with open(os.path.join('tuning', i, 'epochs.json')) as f:
-                results.extend(json.load(f))
+    #tune(5, 30)
+    
+    with open('tuning/run_2025-2-18_18_49/epochs.json') as f:
+        results = json.load(f)
+    
 
     rewards = [[j[0] for j in i] for i in results]
     costs = [[j[1] for j in i] for i in results]
@@ -650,11 +651,10 @@ if __name__ == '__main__':
     r.plot(R:=[sum(i)/len(i) for i in zip(*rewards)])
     c.plot(C:=[sum(i)/len(i) for i in zip(*costs)])
     avg.plot([a/b for a, b in zip(R, C)])
-    plt.suptitle('Default Approach')
+    plt.suptitle('More Exploration tune(5, 30)')
     plt.show()
-    '''
-    w = Workload('tpch')
-    print(len({str(w.query_costs()) for _ in range(5)}))
+    
+    
 
     
 
