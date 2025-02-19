@@ -575,22 +575,32 @@ def tune(epochs, iterations) -> None:
 def display_tuning_results(path:str) -> None:
     with open(os.path.join(path, 'epochs.json')) as f:
         results = json.load(f)
+
+    with open('tuning/run_2025-2-18_20_51/epochs.json') as f:
+        results.extend(json.load(f))
     
 
     rewards = [[j[0] for j in i] for i in results]
     costs = [[j[1] for j in i] for i in results]
-    
-    fig, [r, c, avg] = plt.subplots(nrows=1, ncols=3)
+    latency = [[j[2] for j in i] for i in results if len(i[0]) > 2]
+    fig, [r, c, avg, lt] = plt.subplots(nrows=1, ncols=4)
     r.plot(R:=[sum(i)/len(i) for i in zip(*rewards)])
     c.plot(C:=[sum(i)/len(i) for i in zip(*costs)])
     avg.plot([a/b for a, b in zip(R, C)])
+    lt.plot([sum(i)/len(i) for i in zip(*latency)])
+
+    r.set_title('Reward(Latency)')
+    c.set_title('Storage Space (in MB)')
+    avg.set_title('Reward(Latency)/Storage')
+    lt.set_title('Latency')
     #plt.suptitle('More Exploration tune(5, 30)')
     plt.show()
 
 
 if __name__ == '__main__':
-    tune(10, 30)
-    #display_tuning_results('tuning/run_2025-2-18_20_51')
+    #tune(10, 30)
+    #tuning/run_2025-2-18_20_51
+    display_tuning_results('tuning/run_2025-2-19_9_4')
     
     
     
