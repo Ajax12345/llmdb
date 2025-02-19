@@ -539,63 +539,6 @@ def test_generate_indexes(workload:str) -> None:
         }, f)
 
 
-def test_critic() -> None:
-    '''
-    w = Workload('tpch')
-    p = w.table_policies(algo='top_k')
-    pd = {i.table:i for i in p}
-    #print(p[0].fetch_index_col_schema(["n_nationkey", "n_name", "n_regionkey"]))
-    
-    w.reset_indexes()
-
-    default_costs = w.query_costs()
-    print('default costs', default_costs)
-    row_by_row = []
-    with open('tuning/run_2025-2-17_13_46/indexes.json') as f:
-        data = [[(i['table'], j) for j in i['indexes']] for i in json.load(f)]
-        for i in zip(*data):
-            tbl_ind_m = dict(i)
-            all_ind = ', '.join(f'{a}.{j}' for a, b in i for j in b)
-            w.apply_index_configuration(tbl_ind_m)
-            c_costs = w.query_costs()
-            storage_consumption = float(w.index_storage_size())
-            print('c_costs here', c_costs)
-            cost_diff = {a:default_costs[a] - b for a, b in c_costs.items()}
-            row_by_row.append(D:={
-                'tbl_ind_m': tbl_ind_m,
-                'all_ind': all_ind,
-                'storage_consumption': storage_consumption,
-                'cost_diff': cost_diff,
-                'c_costs': c_costs,
-                'default_costs': default_costs
-            })
-            print(D)
-            print('-'*60)
-
-    with open('tuning/run_2025-2-17_13_46/critic_staging.json', 'w') as f:
-        json.dump(row_by_row, f)
-    '''
-    '''
-    with open('tuning/run_2025-2-17_13_46/critic_staging.json') as f:
-        data = json.load(f)
-        results = []
-        for i in data:
-            reward = round(sum(((i['default_costs'][a] - b) if b >= 0 else b)/i['default_costs'][a] for a, b in i['c_costs'].items()), 2)
-            results.append((i['all_ind'], reward, i['storage_consumption']))
-            print(f"configuration: {i['all_ind']}; reward: {reward}; storage size: {i['storage_consumption']} MB")
-
-
-        print('\n'.join(sorted({f'{a}.{j}' for t in data for a, b in t['tbl_ind_m'].items() for j in pd[a].fetch_index_col_schema(b)})))
-    
-    
-    with open('prompts/critic/system.txt') as f, \
-        open('prompts/critic/user.txt') as f1:
-    
-        sys, user = f.read(), f1.read()
-
-    resp = db_gpt.query_gpt(db_gpt.CLIENT, sys, user)
-    print(resp)
-    '''
 
 def tune(epochs, iterations) -> None:
     final_results = []
@@ -620,7 +563,7 @@ def tune(epochs, iterations) -> None:
             storage_consumption = float(w.index_storage_size())
             reward = round(sum(((default_costs[a] - b) if b >= 0 else b)/default_costs[a] for a, b in c_costs.items()), 2)
             critic.evaluate(recommendations, reward, storage_consumption)
-            results.append([reward, storage_consumption])
+            results.append([reward, storage_consumption, pow(functools.reduce(lambda x, y: x*y, c_costs.values()), 1/len(c_costs))])
 
         final_results.append(results)
         with open(os.path.join(path, 'epochs.json'), 'w') as f:
@@ -628,19 +571,9 @@ def tune(epochs, iterations) -> None:
     
 
     print('epoch data saved to: ', path)
-    '''
-    fig, [r, c, avg] = plt.subplots(nrows=1, ncols=3)
-    r.plot([a for a, _ in results])
-    c.plot([b for _, b in results])
-    avg.plot([a/b for a, b in results])
-    plt.show()
-    '''
-
-
-if __name__ == '__main__':
-    #tune(5, 30)
     
-    with open('tuning/run_2025-2-18_18_49/epochs.json') as f:
+def display_tuning_results(path:str) -> None:
+    with open(os.path.join(path, 'epochs.json')) as f:
         results = json.load(f)
     
 
@@ -651,8 +584,15 @@ if __name__ == '__main__':
     r.plot(R:=[sum(i)/len(i) for i in zip(*rewards)])
     c.plot(C:=[sum(i)/len(i) for i in zip(*costs)])
     avg.plot([a/b for a, b in zip(R, C)])
-    plt.suptitle('More Exploration tune(5, 30)')
+    #plt.suptitle('More Exploration tune(5, 30)')
     plt.show()
+
+
+if __name__ == '__main__':
+    tune(10, 30)
+    #display_tuning_results('tuning/run_2025-2-18_20_51')
+    
+    
     
     
 
