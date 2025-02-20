@@ -563,7 +563,7 @@ def tune(epochs, iterations) -> None:
             storage_consumption = float(w.index_storage_size())
             reward = round(sum(((default_costs[a] - b) if b >= 0 else b)/default_costs[a] for a, b in c_costs.items()), 2)
             critic.evaluate(recommendations, reward, storage_consumption)
-            results.append([reward, storage_consumption, pow(functools.reduce(lambda x, y: x*y, c_costs.values()), 1/len(c_costs))])
+            results.append([reward, storage_consumption, reward/storage_consumption, pow(functools.reduce(lambda x, y: x*y, c_costs.values()), 1/len(c_costs))])
 
         final_results.append(results)
         with open(os.path.join(path, 'epochs.json'), 'w') as f:
@@ -598,6 +598,13 @@ def display_tuning_results(path:str) -> None:
     plt.show()
 
 def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
+    def confidence(d):
+        mean = [sum(i)/len(i) for i in zip(*d)]
+        std = [pow(sum(pow(a - u, 2) for a in i)/len(i), 0.5) for i, u in zip(zip(*d), mean)]
+        upper = [a + b for a, b in zip(mean, std)]
+        lower = [a - b for a, b in zip(mean, std)]
+        return mean, upper, lower
+
     fig, [r, c, avg, lt] = plt.subplots(nrows=1, ncols=4)
     for label, data in tuning_results:
         results = []
@@ -608,10 +615,19 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
         rewards = [[j[0] for j in i] for i in results]
         costs = [[j[1] for j in i] for i in results]
         latency = [[j[2] for j in i] for i in results if len(i[0]) > 2]
-        r.plot(R:=[sum(i)/len(i) for i in zip(*rewards)], label = label)
-        c.plot(C:=[sum(i)/len(i) for i in zip(*costs)], label = label)
-        avg.plot([a/b for a, b in zip(R, C)], label = label)
-        lt.plot([sum(i)/len(i) for i in zip(*latency)], label = label)
+
+        for a, b in zip([r, c, lt], [rewards, costs, latency]):
+            rm, ru, rl = confidence(b)
+            a.plot(rm, label = label)
+            a.plot(rl, color='tab:blue', alpha=0.1)
+            a.plot(ru, color='tab:blue', alpha=0.1)
+            a.fill_between([*range(len(rl))], rl, ru, alpha=0.2)
+
+        R = [sum(i)/len(i) for i in zip(*rewards)]
+        C = [sum(i)/len(i) for i in zip(*costs)]
+        R_C_avg = [a/b for a, b in zip(R, C)]
+
+        avg.plot(R_C_avg, label = label)
 
     r.set_title('Reward(Latency)')
     c.set_title('Storage Space (in MB)')
@@ -627,7 +643,7 @@ if __name__ == '__main__':
     #display_tuning_results('tuning/run_2025-2-19_17_14')
     display_multi_tuning_results([
         ('frequency', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
-        ('weights', ['run_2025-2-19_17_14'])
+        #('weights', ['run_2025-2-19_17_14'])
     ])
 
     
