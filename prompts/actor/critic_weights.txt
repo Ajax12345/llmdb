@@ -1,0 +1,3 @@
+Below is a list of columns and associated weights, in the form <COLUMN_NAME>:<WEIGHT>. Columns with higher weights have been shown to improve latency with a lower memory footprint. Make sure that the columns you recommend for indexing have higher weight values relative to the others.
+
+{column_weights}

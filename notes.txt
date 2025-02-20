@@ -37,3 +37,10 @@ To do:
     - Add bandit for policy selection
     - observation window truncation
     - use single reward/storage_scale metric
+
+tuning/run_2025-2-19_9_4
+    - Best so far (10 epochs, basic frequency/hard coded gradient)
+    - Also use in conjunction with prior run: tuning/run_2025-2-18_20_51
+
+tuning/run_2025-2-19_17_14
+    - Using Critic to produce weights for each column
