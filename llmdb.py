@@ -228,10 +228,14 @@ class Policy:
         return f'{self.__class__.__name__}({self.table})'
 
 class Critic:
-    def __init__(self, policies:dict, evaluate_after:int = 3) -> None:
+    def __init__(self, policies:dict, 
+            evaluate_after:int = 3,
+            storage_budget:typing.Union[None, str] = None) -> None:
+        
         self.policies = policies
         self.observations = []
         self.evaluate_after = evaluate_after
+        self.storage_budget = storage_budget
     
     def evaluate(self, *args) -> None:
         for _ in range(2):
@@ -253,13 +257,20 @@ class Critic:
         configuration = '\n'.join(f'''configuration: {", ".join(f'{a}.{j}' for a, b in ind.items() for j in b)}; reward: {reward}; storage size: {storage} MB''' for ind, reward, storage in self.observations)
         
         with open('prompts/critic/system.txt') as f, \
-            open('prompts/critic/user.txt') as f1:
+            open('prompts/critic/user.txt') as f1, \
+            open('prompts/critic/storage_budget.txt') as f2:
         
             sys, user = f.read(), f1.read()
+            sb = f2.read()
+
+        storage_budget = ""
+        if self.storage_budget is not None:
+            storage_budget = sb.format(storage_budget = self.storage_budget)
 
         user_prompt = user.format(
             schema = schema,
-            configuration = configuration
+            configuration = configuration,
+            storage_budget = storage_budget
         )
         print('in user prompt in critic')
         print(user_prompt)
@@ -550,7 +561,11 @@ def tune(epochs, iterations) -> None:
         w = Workload('tpch')
         p = w.table_policies(algo='top_k')
         pd = {i.table:i for i in p}
-        critic = Critic(pd, evaluate_after=tuning_config['critic']['evaluate_after'])
+
+        critic = Critic(pd, 
+            evaluate_after=tuning_config['critic']['evaluate_after'],
+            storage_budget = tuning_config['critic']['storage_budget'])
+        
         w.reset_indexes()
         default_costs = w.query_costs()
 
@@ -614,7 +629,7 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
             
         rewards = [[j[0] for j in i] for i in results]
         costs = [[j[1] for j in i] for i in results]
-        latency = [[j[2] for j in i] for i in results if len(i[0]) > 2]
+        latency = [[j[-1] for j in i] for i in results if len(i[0]) > 2]
 
         for a, b in zip([r, c, lt], [rewards, costs, latency]):
             rm, ru, rl = confidence(b)
@@ -622,18 +637,21 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
             a.plot(rl, color='tab:blue', alpha=0.1)
             a.plot(ru, color='tab:blue', alpha=0.1)
             a.fill_between([*range(len(rl))], rl, ru, alpha=0.2)
+            a.legend(loc='lower right')
 
         R = [sum(i)/len(i) for i in zip(*rewards)]
         C = [sum(i)/len(i) for i in zip(*costs)]
         R_C_avg = [a/b for a, b in zip(R, C)]
 
         avg.plot(R_C_avg, label = label)
+        avg.legend(loc='lower right')
 
-    r.set_title('Reward(Latency)')
+    r.set_title('Workload Cost Improvement')
     c.set_title('Storage Space (in MB)')
-    avg.set_title('Reward(Latency)/Storage')
-    lt.set_title('Latency')
+    avg.set_title('Cost Improvement/Storage')
+    lt.set_title('Workload Cost')
     #plt.suptitle('More Exploration tune(5, 30)')
+
     plt.show()
 
 
@@ -641,10 +659,14 @@ if __name__ == '__main__':
     #tune(10, 30)
     #tuning/run_2025-2-18_20_51
     #display_tuning_results('tuning/run_2025-2-19_17_14')
+    
     display_multi_tuning_results([
-        ('frequency', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
+        ('budget unaware', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
+        ('budget aware', ['run_2025-2-20_11_36', 'run_2025-2-20_15_52'])
         #('weights', ['run_2025-2-19_17_14'])
     ])
+    
+
 
     
     

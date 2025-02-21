@@ -3,6 +3,7 @@
         "cold_start": 10
     },
     "critic":{
-        "evaluate_after": 10
+        "evaluate_after": 10,
+        "storage_budget": "1000 MB"
     }
 }

@@ -8,7 +8,7 @@ Below are the proposed columns to be indexed, along with the reward observed aft
 
 {configuration}
 
-Output a list of columns from across the different proposed configurations that contribute most to maximizing the reward, while being mindful of the storage space required when these columns are indexed.
+Output a list of columns from across the different proposed configurations that contribute most to maximizing the reward, while being mindful of the storage space required when these columns are indexed. {storage_budget}
 Also, output a list of columns that should not be indexed. These columns either fail to contribute significantly to maximizing the reward or have too high storage space overhead.
 
 ```json
