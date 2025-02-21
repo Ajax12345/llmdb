@@ -4,6 +4,6 @@
     },
     "critic":{
         "evaluate_after": 10,
-        "storage_budget": "1000 MB"
+        "storage_budget": null
     }
 }

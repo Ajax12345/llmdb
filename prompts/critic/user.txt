@@ -1,10 +1,10 @@
-Included in this prompt are a series of proposed database table column index configurations, along with an associated reward and required storage size (in megabytes) of the indexes when deployed to the database. Your job is to evaluate the different candidate columns to be indexed and choose the columns that, when indexed, contribute most to maximizing the reward associated with it the configuration. In addition, you must take into account the associated index storage size: the greater the storage size, the greater the costs when deploying the index configuration. Therefore, you must weigh the tradeoff between an increase in a reward and a increase in storage size.
+Included in this prompt are a series of proposed database table column index configurations, along with an associated reward and required storage size (in megabytes) of the indexes when deployed to the database. Your job is to evaluate the different candidate columns to be indexed and choose the columns that, when indexed, contribute most to maximizing the reward associated with the configuration. In addition, you must take into account the associated index storage size: the greater the storage size, the greater the costs when deploying the index configuration. Therefore, you must weigh the tradeoff between an increase in a reward and a increase in storage size.
 
-For more information on the datatypes of the columns that are being indexed, below is a SQL column creation schema:
+Below is a list of columns that are being indexed, along with their datatypes and the space required (in megabytes) to store the column's index:
 
 {schema}
 
-Below are the proposed columns to be indexed, along with the reward observed after the indexes are deployed and the associated storage size:
+Below is a list of column index configurations, along with the reward observed after the indexes are deployed and the associated storage size:
 
 {configuration}
 

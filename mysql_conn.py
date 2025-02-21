@@ -282,6 +282,18 @@ class MySQL:
         return sum(i['size_in_mb'] for i in self.cur if i['index_name'] != 'GEN_CLUST_INDEX' and i['database_name'] == self.database)
 
     @DB_EXISTS()
+    def index_storage_consumption(self) -> dict:
+        self.cur.execute('''
+        SELECT database_name, table_name, index_name,
+        ROUND(stat_value * @@innodb_page_size / 1024 / 1024, 2) size_in_mb
+        FROM mysql.innodb_index_stats
+        WHERE stat_name = 'size' AND index_name != 'PRIMARY'
+        ORDER BY size_in_mb DESC;
+        ''')
+        return {f'{i["table_name"]}.{i["index_name"].replace("LLMDB_INDEX_", "")}':float(i['size_in_mb']) for i in self.cur if i['index_name'] != 'GEN_CLUST_INDEX'}
+
+
+    @DB_EXISTS()
     def drop_all_indices(self) -> None:
         for col_data in self.get_columns_from_database():
             
@@ -389,12 +401,13 @@ if __name__ == '__main__':
         
         conn.apply_index_configuration({})
         conn.apply_index_configuration({'orders': ['o_orderkey'], 'customer': ['c_custkey', 'c_name', 'c_nationkey'], 'part': ['p_partkey', 'p_brand']})
-        '''
+        
         cols = {i['TABLE_NAME'] for i in conn.get_columns_from_database()}
         for i in cols:
             print(i, [j['Key_name'] for j in conn.get_indices(i)])
-        '''
-        print([conn.compute_index_storage() for _ in range(5)])
+        
+        print(conn.index_storage_consumption())
+        #print([conn.compute_index_storage() for _ in range(5)])
      
         
         

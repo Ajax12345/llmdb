@@ -228,11 +228,13 @@ class Policy:
         return f'{self.__class__.__name__}({self.table})'
 
 class Critic:
-    def __init__(self, policies:dict, 
+    def __init__(self, policies:dict,
+            workload:'Workload',
             evaluate_after:int = 3,
             storage_budget:typing.Union[None, str] = None) -> None:
         
         self.policies = policies
+        self.workload = workload
         self.observations = []
         self.evaluate_after = evaluate_after
         self.storage_budget = storage_budget
@@ -250,6 +252,11 @@ class Critic:
 
         if len(self.observations) <= self.evaluate_after:
             return
+        
+        def schema_row_display(tbl:str, j:str) -> str:
+            col, *dt = j.split()
+            full_col = f'{tbl}.{col}'
+            return f'column: {full_col}, datatype: {" ".join(dt)}, index storage size: {self.workload.index_sizes[full_col]} MB'
         
         schema = '\n'.join(sorted({f'{a}.{j}' for i, *_ in self.observations \
                     for a, b in i.items() for j in self.policies[a].fetch_index_col_schema(b)}))
@@ -296,6 +303,7 @@ class Workload:
         self._query_embeddings = load_workload_embeddings(workload)
         self._table_embeddings = load_workload_schema_embeddings(workload)
         self._query_table_mappings = load_workload_query_table_mappings(workload)
+        self.index_sizes = {}
         assert self.query_num == len(self._query_embeddings)
         assert self.table_num == len(self._table_embeddings)
 
@@ -322,7 +330,11 @@ class Workload:
     def index_storage_size(self) -> float: 
         with mysql_conn.MySQL(database=self.workload) as conn:
             return conn.compute_index_storage()
-    
+        
+    def update_index_storage_consumption(self) -> dict:
+        with mysql_conn.MySQL(database=self.workload) as conn:
+            self.index_sizes.update(conn.index_storage_consumption())
+        
     def reset_indexes(self) -> None:
         self.apply_index_configuration({})
         
@@ -562,7 +574,7 @@ def tune(epochs, iterations) -> None:
         p = w.table_policies(algo='top_k')
         pd = {i.table:i for i in p}
 
-        critic = Critic(pd, 
+        critic = Critic(pd, w,
             evaluate_after=tuning_config['critic']['evaluate_after'],
             storage_budget = tuning_config['critic']['storage_budget'])
         
@@ -576,6 +588,7 @@ def tune(epochs, iterations) -> None:
             w.apply_index_configuration(recommendations)
             c_costs = w.query_costs()
             storage_consumption = float(w.index_storage_size())
+            w.update_index_storage_consumption()
             reward = round(sum(((default_costs[a] - b) if b >= 0 else b)/default_costs[a] for a, b in c_costs.items()), 2)
             critic.evaluate(recommendations, reward, storage_consumption)
             results.append([reward, storage_consumption, reward/storage_consumption, pow(functools.reduce(lambda x, y: x*y, c_costs.values()), 1/len(c_costs))])
@@ -656,14 +669,14 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
 
 
 if __name__ == '__main__':
-    #tune(10, 30)
+    #tune(15, 30)
     #tuning/run_2025-2-18_20_51
     #display_tuning_results('tuning/run_2025-2-19_17_14')
     
     display_multi_tuning_results([
-        ('budget unaware', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
-        ('budget aware', ['run_2025-2-20_11_36', 'run_2025-2-20_15_52'])
-        #('weights', ['run_2025-2-19_17_14'])
+        ('budgetless', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
+        ('budget aware', ['run_2025-2-20_11_36', 'run_2025-2-20_15_52']),
+        #('budgetless storage-aware', ['run_2025-2-20_20_48'])
     ])
     
 

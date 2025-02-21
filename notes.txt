@@ -37,7 +37,7 @@ To do:
     - Add bandit for policy selection
     - observation window truncation
     - use single reward/storage_scale metric
-    - Tell the critic user prompt to explicitly maximize reward and minimize storage
+    - Give critic actual statistics on index size
 
 tuning/run_2025-2-19_9_4
     - Best so far (10 epochs, basic frequency/hard coded gradient)
@@ -49,3 +49,7 @@ tuning/run_2025-2-19_17_14
 tuning/run_2025-2-20_11_36
 tuning/run_2025-2-20_15_52
     - Specifying storage budget
+
+
+run_2025-2-20_20_48
+    - budgetless, specifying the column index storage in critic schema
