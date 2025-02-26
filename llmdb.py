@@ -644,13 +644,15 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
         costs = [[j[1] for j in i] for i in results]
         latency = [[j[-1] for j in i] for i in results if len(i[0]) > 2]
 
-        for a, b in zip([r, c, lt], [rewards, costs, latency]):
+        for a, b, ylabel in zip([r, c, lt], [rewards, costs, latency], ['Cost Improvement', 'Storage Size (MB)', 'Workload Query Cost']):
             rm, ru, rl = confidence(b)
             a.plot(rm, label = label)
             a.plot(rl, color='tab:blue', alpha=0.1)
             a.plot(ru, color='tab:blue', alpha=0.1)
             a.fill_between([*range(len(rl))], rl, ru, alpha=0.2)
             a.legend(loc='lower right')
+            a.set_xlabel('Iteration')
+            a.set_ylabel(ylabel)
 
         R = [sum(i)/len(i) for i in zip(*rewards)]
         C = [sum(i)/len(i) for i in zip(*costs)]
@@ -658,13 +660,16 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
 
         avg.plot(R_C_avg, label = label)
         avg.legend(loc='lower right')
+        avg.set_xlabel("Iteration")
+        avg.set_ylabel("Cost Improvement/Storage ratio")
 
     r.set_title('Workload Cost Improvement')
-    c.set_title('Storage Space (in MB)')
+    c.set_title('Index Storage Space (in MB)')
     avg.set_title('Cost Improvement/Storage')
     lt.set_title('Workload Cost')
     #plt.suptitle('More Exploration tune(5, 30)')
-
+    plt.subplots_adjust(left = 0.1, top = 0.9, right = 0.9, bottom = 0.1, hspace = 0.5, wspace = 0.5)
+    plt.suptitle('4GB TPC-H Database with 22-query Workload')
     plt.show()
 
 
