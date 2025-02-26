@@ -1,1 +1,3 @@
-# llmdb
+# LLM-DB: Storage-aware Database Indexing with Large Language Models
+
+The goal of the LLM-DB project is to investigate the following question: can an LLM (in this case, [`GPT-4o-mini`](https://platform.openai.com/docs/models)) learn a near-optimal databse index configuration for a large, multi-query workload, while weighing the tradeoff between decreased query cost and increased index storage consumption? Preliminary results suggest that an actor-critic system, using multi-armed bandits to explore the workload query search space, can learn these tradeoffs (both with and without a specific storage budget), and suggest index configurations that are competitive with preexisting reinforcement learning (RL)-based index selectors.

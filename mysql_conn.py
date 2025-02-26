@@ -400,6 +400,7 @@ if __name__ == '__main__':
         #print(conn.compute_index_storage())
         
         conn.apply_index_configuration({})
+        '''
         conn.apply_index_configuration({'orders': ['o_orderkey'], 'customer': ['c_custkey', 'c_name', 'c_nationkey'], 'part': ['p_partkey', 'p_brand']})
         
         cols = {i['TABLE_NAME'] for i in conn.get_columns_from_database()}
@@ -408,6 +409,6 @@ if __name__ == '__main__':
         
         print(conn.index_storage_consumption())
         #print([conn.compute_index_storage() for _ in range(5)])
-     
+        '''
         
         

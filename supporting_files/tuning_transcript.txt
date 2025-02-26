@@ -11386,6 +11386,8 @@ supplier.s_suppkey BIGINT NOT NULL
 
 Below are the proposed columns to be indexed, along with the reward observed after the indexes are deployed and the associated storage size:
 
+The budget for storage space is 1000 MB. Your recommended configuration must not exceed this number.
+
 configuration: region.r_name, part.p_partkey, part.p_size, part.p_type, supplier.s_nationkey, supplier.s_name, customer.c_nationkey, orders.o_custkey, orders.o_orderdate, orders.o_orderkey, lineitem.l_partkey, lineitem.l_quantity, lineitem.l_shipmode, lineitem.l_shipinstruct; reward: 17.46; storage size: 2291.95 MB
 configuration: nation.n_nationkey, region.r_name, part.p_partkey, part.p_name, supplier.s_suppkey, supplier.s_nationkey, supplier.s_acctbal, partsupp.ps_suppkey, customer.c_custkey, orders.o_custkey, orders.o_orderdate, lineitem.l_shipdate, lineitem.l_returnflag, lineitem.l_linestatus; reward: 16.47; storage size: 1103.42 MB
 configuration: region.r_name, part.p_partkey, part.p_name, supplier.s_suppkey, supplier.s_nationkey, supplier.s_acctbal, partsupp.ps_partkey, partsupp.ps_suppkey, partsupp.ps_supplycost, orders.o_orderkey, orders.o_custkey, orders.o_totalprice, orders.o_orderdate, lineitem.l_shipmode, lineitem.l_commitdate, lineitem.l_receiptdate, lineitem.l_shipdate; reward: 17.47; storage size: 1876.38 MB

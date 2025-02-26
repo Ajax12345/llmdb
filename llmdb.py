@@ -654,7 +654,7 @@ def display_multi_tuning_results(tuning_results:typing.List[tuple]) -> None:
 
         R = [sum(i)/len(i) for i in zip(*rewards)]
         C = [sum(i)/len(i) for i in zip(*costs)]
-        R_C_avg = [a/b for a, b in zip(R, C)]
+        R_C_avg = [a/(b or 1) for a, b in zip(R, C)]
 
         avg.plot(R_C_avg, label = label)
         avg.legend(loc='lower right')
@@ -676,7 +676,8 @@ if __name__ == '__main__':
     display_multi_tuning_results([
         ('budgetless', ['run_2025-2-19_9_4', 'run_2025-2-18_20_51']),
         ('budget aware', ['run_2025-2-20_11_36', 'run_2025-2-20_15_52']),
-        #('budgetless storage-aware', ['run_2025-2-20_20_48'])
+        #('budgetless storage-aware', ['run_2025-2-20_20_48']),
+        ('smartix', ['run_2025-2-23_smartix']),
     ])
     
 
